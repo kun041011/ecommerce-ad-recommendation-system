@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth
+from app.api import auth, products, orders, community, behavior
 
 app = FastAPI(title="E-Commerce Ad Recommendation System", version="1.0.0")
 
@@ -14,6 +14,10 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(products.router)
+app.include_router(orders.router)
+app.include_router(community.router)
+app.include_router(behavior.router)
 
 
 def init_db():
