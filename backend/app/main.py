@@ -1,9 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.database import Base, engine
-
-Base.metadata.create_all(bind=engine)
+from app.api import auth
 
 app = FastAPI(title="E-Commerce Ad Recommendation System", version="1.0.0")
 
@@ -14,6 +12,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth.router)
+
+
+def init_db():
+    import os
+    os.makedirs("data", exist_ok=True)
+    from app.database import Base, engine
+    Base.metadata.create_all(bind=engine)
 
 
 @app.get("/api/health")
