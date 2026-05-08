@@ -4,14 +4,13 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-import tempfile
-
 backend_dir = str(Path(__file__).resolve().parent.parent)
 sys.path.insert(0, backend_dir)
 os.chdir(backend_dir)
 
-# Use Windows temp dir for SQLite (WSL mounts don't support SQLite locking)
-SEED_DB_PATH = os.path.join(tempfile.gettempdir(), "ecommerce_seed.db")
+data_dir = os.path.join(backend_dir, "data")
+os.makedirs(data_dir, exist_ok=True)
+SEED_DB_PATH = os.path.join(data_dir, "ecommerce.db")
 os.environ["DATABASE_URL"] = "sqlite:///" + SEED_DB_PATH.replace("\\", "/")
 
 from app.database import Base, engine
