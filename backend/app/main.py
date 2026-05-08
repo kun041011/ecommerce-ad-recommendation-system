@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, products, orders, community, behavior, ads, activity
+from app.api import auth, products, orders, community, behavior, ads, activity, recommend, analytics
 
 app = FastAPI(title="E-Commerce Ad Recommendation System", version="1.0.0")
 
@@ -20,6 +20,8 @@ app.include_router(community.router)
 app.include_router(behavior.router)
 app.include_router(ads.router)
 app.include_router(activity.router)
+app.include_router(recommend.router)
+app.include_router(analytics.router)
 
 
 def init_db():
