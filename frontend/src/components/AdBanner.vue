@@ -1,13 +1,15 @@
 <template>
-  <div class="ad-banner" @click.stop="handleClick">
-    <div class="ad-badge">推广</div>
-    <div class="ad-content">
-      <div class="ad-icon">&#x1F4E2;</div>
-      <div class="ad-text">
-        <h4 class="ad-title">{{ ad.title }}</h4>
-        <p class="ad-desc">{{ ad.content }}</p>
+  <div class="ad-card" @click.stop="handleClick">
+    <div class="ad-card__img">
+      <span class="ad-card__emoji">📢</span>
+      <span class="ad-card__badge">广告</span>
+    </div>
+    <div class="ad-card__body">
+      <div class="ad-card__name">{{ ad.title }}</div>
+      <div class="ad-card__desc">{{ ad.content }}</div>
+      <div class="ad-card__action">
+        <span class="ad-card__link">查看详情 ›</span>
       </div>
-      <el-button type="warning" size="small" round class="ad-btn">了解详情</el-button>
     </div>
   </div>
 </template>
@@ -29,63 +31,46 @@ function handleClick() {
 </script>
 
 <style scoped>
-.ad-banner {
-  background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
-  border-radius: 12px;
-  padding: 20px;
-  position: relative;
-  cursor: pointer;
-  border: 1px solid rgba(255, 183, 77, 0.3);
-  transition: all 0.3s ease;
+.ad-card {
+  background: #fff;
+  border: 1px solid #fff3e0;
+  border-radius: 8px;
   overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
-
-.ad-banner:hover {
+.ad-card:hover {
+  border-color: var(--taobao-orange);
+  box-shadow: 0 4px 16px rgba(255, 80, 0, 0.1);
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(255, 183, 77, 0.25);
 }
 
-.ad-badge {
-  position: absolute;
-  top: 0;
-  right: 0;
-  background: linear-gradient(135deg, #ff9800, #f57c00);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 3px 12px;
-  border-radius: 0 12px 0 12px;
-}
-
-.ad-content {
+.ad-card__img {
+  height: 180px;
+  background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
   display: flex;
   align-items: center;
-  gap: 14px;
+  justify-content: center;
+  position: relative;
 }
-
-.ad-icon {
-  font-size: 32px;
-  flex-shrink: 0;
-}
-
-.ad-text {
-  flex: 1;
-}
-
-.ad-title {
-  font-size: 15px;
+.ad-card__emoji { font-size: 56px; }
+.ad-card__badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(255, 80, 0, 0.85);
+  color: #fff;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 3px;
   font-weight: 600;
-  color: #1a1a2e;
-  margin: 0 0 4px;
 }
 
-.ad-desc {
-  font-size: 13px;
-  color: #666;
-  margin: 0;
+.ad-card__body { padding: 12px; }
+.ad-card__name {
+  font-size: 14px; color: var(--text-dark); font-weight: 600;
+  margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-
-.ad-btn {
-  flex-shrink: 0;
-}
+.ad-card__desc { font-size: 12px; color: var(--text-light); margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ad-card__link { font-size: 12px; color: var(--taobao-orange); font-weight: 600; }
 </style>

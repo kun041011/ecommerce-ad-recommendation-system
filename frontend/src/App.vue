@@ -1,202 +1,237 @@
 <template>
-  <el-container style="min-height: 100vh; display: flex; flex-direction: column">
-    <el-header class="app-header" height="64px">
-      <div class="header-inner">
-        <div class="logo" @click="$router.push('/')">
-          <span class="logo-icon">&#x1F6D2;</span>
-          <span class="logo-text">智推商城</span>
-        </div>
-        <el-menu
-          mode="horizontal"
-          :router="true"
-          :default-active="$route.path"
-          class="nav-menu"
-          background-color="transparent"
-          text-color="#fff"
-          active-text-color="#ffd700"
-        >
-          <el-menu-item index="/">首页</el-menu-item>
-          <el-menu-item index="/search">搜索</el-menu-item>
-          <el-menu-item index="/cart" v-if="userStore.user">
-            购物车
-          </el-menu-item>
-          <el-menu-item index="/orders" v-if="userStore.user">订单</el-menu-item>
-          <el-menu-item index="/profile" v-if="userStore.user">个人中心</el-menu-item>
-          <el-menu-item index="/merchant" v-if="userStore.user?.role === 'merchant'">商家后台</el-menu-item>
-          <el-menu-item index="/admin" v-if="userStore.user?.role === 'admin'">管理后台</el-menu-item>
-        </el-menu>
-        <div class="header-right">
+  <div class="app-wrapper">
+    <!-- Top utility bar -->
+    <div class="top-bar">
+      <div class="top-bar__inner page-container">
+        <div class="top-bar__left">
           <template v-if="userStore.user">
-            <span class="welcome-text">{{ userStore.user.username }}</span>
-            <el-button text class="logout-btn" @click="userStore.logout()">退出</el-button>
+            <span>你好，<strong>{{ userStore.user.username }}</strong></span>
+            <a href="javascript:;" @click="userStore.logout()">退出登录</a>
           </template>
           <template v-else>
-            <el-button class="login-btn" @click="$router.push('/login')">登录</el-button>
-            <el-button class="register-btn" type="primary" @click="$router.push('/register')">注册</el-button>
+            <span>你好，请</span>
+            <router-link to="/login">登录</router-link>
+            <router-link to="/register">免费注册</router-link>
           </template>
         </div>
+        <div class="top-bar__right">
+          <router-link to="/orders" v-if="userStore.user">我的订单</router-link>
+          <router-link to="/profile" v-if="userStore.user">个人中心</router-link>
+          <router-link to="/merchant" v-if="userStore.user?.role === 'merchant'">商家后台</router-link>
+          <router-link to="/admin" v-if="userStore.user?.role === 'admin'">管理后台</router-link>
+        </div>
       </div>
-    </el-header>
-    <el-main class="app-main">
+    </div>
+
+    <!-- Main header -->
+    <header class="main-header">
+      <div class="main-header__inner page-container">
+        <div class="logo" @click="$router.push('/')">
+          <div class="logo__icon">智推</div>
+          <span class="logo__text">MALL</span>
+        </div>
+        <div class="header-search">
+          <input
+            v-model="searchQuery"
+            class="header-search__input"
+            placeholder="搜索商品、品牌、品类..."
+            @keyup.enter="doSearch"
+          />
+          <button class="header-search__btn" @click="doSearch">搜索</button>
+        </div>
+        <div class="header-cart" @click="$router.push('/cart')" v-if="userStore.user">
+          <span class="header-cart__icon">🛒</span>
+          <span class="header-cart__text">购物车</span>
+          <span class="header-cart__badge" v-if="cartCount > 0">{{ cartCount }}</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Navigation bar -->
+    <nav class="nav-bar">
+      <div class="nav-bar__inner page-container">
+        <router-link to="/" class="nav-link" :class="{ active: $route.path === '/' }">首页</router-link>
+        <router-link to="/search?category=电子产品" class="nav-link">电子产品</router-link>
+        <router-link to="/search?category=服装鞋帽" class="nav-link">服装鞋帽</router-link>
+        <router-link to="/search?category=食品饮料" class="nav-link">食品饮料</router-link>
+        <router-link to="/search?category=家居家装" class="nav-link">家居家装</router-link>
+        <router-link to="/search?category=美妆个护" class="nav-link">美妆个护</router-link>
+        <router-link to="/search?category=运动户外" class="nav-link">运动户外</router-link>
+        <router-link to="/search?category=图书音像" class="nav-link">图书音像</router-link>
+      </div>
+    </nav>
+
+    <!-- Main content -->
+    <main class="app-main">
       <div class="page-container">
         <router-view />
       </div>
-    </el-main>
+    </main>
+
+    <!-- Footer -->
     <footer class="app-footer">
-      <div class="footer-inner">
-        <div class="footer-brand">
-          <span class="logo-icon">&#x1F6D2;</span> 智推商城
+      <div class="page-container">
+        <div class="footer-grid">
+          <div class="footer-col">
+            <h4>购物指南</h4>
+            <p>购物流程</p>
+            <p>会员介绍</p>
+            <p>常见问题</p>
+          </div>
+          <div class="footer-col">
+            <h4>配送方式</h4>
+            <p>上门自提</p>
+            <p>配送服务</p>
+            <p>配送范围</p>
+          </div>
+          <div class="footer-col">
+            <h4>支付方式</h4>
+            <p>在线支付</p>
+            <p>货到付款</p>
+            <p>分期付款</p>
+          </div>
+          <div class="footer-col">
+            <h4>售后服务</h4>
+            <p>售后政策</p>
+            <p>退换货流程</p>
+            <p>联系客服</p>
+          </div>
+          <div class="footer-col">
+            <h4>关于我们</h4>
+            <p>智能推荐引擎</p>
+            <p>社区驱动频控</p>
+            <p>商业化最大化</p>
+          </div>
         </div>
-        <div class="footer-links">
-          <span>智能推荐引擎</span>
-          <span class="dot">·</span>
-          <span>社区驱动频控</span>
-          <span class="dot">·</span>
-          <span>商业化最大化</span>
+        <div class="footer-bottom">
+          <p>© 2026 智推商城 — 基于社区数据反馈的电商广告推荐系统</p>
         </div>
-        <div class="footer-copy">&copy; 2026 E-Commerce Ad Recommendation System</div>
       </div>
     </footer>
-  </el-container>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useUserStore } from './stores/user'
+import { useCartStore } from './stores/cart'
 
 const userStore = useUserStore()
+const cartStore = useCartStore()
+const router = useRouter()
+const searchQuery = ref('')
+
+const cartCount = computed(() => cartStore.items.reduce((s, i) => s + i.quantity, 0))
+
+function doSearch() {
+  if (searchQuery.value.trim()) {
+    router.push({ path: '/search', query: { q: searchQuery.value } })
+  }
+}
+
 onMounted(() => userStore.fetchUser())
 </script>
 
 <style scoped>
-.app-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 0;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  box-shadow: 0 2px 12px rgba(102, 126, 234, 0.4);
-}
+.app-wrapper { display: flex; flex-direction: column; min-height: 100vh; }
 
-.header-inner {
-  max-width: 1200px;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  height: 64px;
-  padding: 0 20px;
-}
+/* Top bar */
+.top-bar { background: #333; font-size: 12px; color: #ccc; line-height: 30px; }
+.top-bar__inner { display: flex; justify-content: space-between; }
+.top-bar__left, .top-bar__right { display: flex; gap: 12px; align-items: center; }
+.top-bar a { color: #ccc; text-decoration: none; }
+.top-bar a:hover { color: #fff; }
 
-.logo {
-  display: flex;
-  align-items: center;
+/* Main header */
+.main-header { background: #fff; border-bottom: 1px solid #e8e8e8; }
+.main-header__inner { display: flex; align-items: center; height: 80px; gap: 40px; }
+
+.logo { display: flex; align-items: center; cursor: pointer; flex-shrink: 0; gap: 6px; }
+.logo__icon {
+  background: var(--jd-red);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 800;
+  padding: 6px 10px;
+  border-radius: 6px;
+  letter-spacing: 2px;
+}
+.logo__text { font-size: 22px; font-weight: 700; color: var(--text-dark); letter-spacing: 1px; }
+
+.header-search { flex: 1; max-width: 560px; display: flex; height: 40px; }
+.header-search__input {
+  flex: 1;
+  border: 2px solid var(--jd-red);
+  border-right: none;
+  padding: 0 16px;
+  font-size: 14px;
+  outline: none;
+  border-radius: 0;
+}
+.header-search__btn {
+  width: 80px;
+  background: var(--jd-red);
+  color: #fff;
+  border: 2px solid var(--jd-red);
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
-  margin-right: 20px;
-  flex-shrink: 0;
+  letter-spacing: 2px;
 }
+.header-search__btn:hover { background: #c91f17; border-color: #c91f17; }
 
-.logo-icon {
-  font-size: 28px;
-  margin-right: 8px;
-}
-
-.logo-text {
-  font-size: 20px;
-  font-weight: 700;
-  color: #fff;
-  letter-spacing: 1px;
-}
-
-.nav-menu {
-  flex: 1;
-  border-bottom: none !important;
-}
-
-.nav-menu .el-menu-item {
-  font-size: 14px;
-  font-weight: 500;
-  border-bottom: none !important;
-  transition: all 0.2s;
-}
-
-.nav-menu .el-menu-item:hover {
-  background: rgba(255, 255, 255, 0.15) !important;
-  border-radius: 8px;
-}
-
-.nav-menu .el-menu-item.is-active {
-  background: rgba(255, 255, 255, 0.2) !important;
-  border-radius: 8px;
-  border-bottom: none !important;
-}
-
-.header-right {
+.header-cart {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.welcome-text {
-  color: rgba(255, 255, 255, 0.9);
+  gap: 4px;
+  padding: 8px 20px;
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  cursor: pointer;
+  position: relative;
   font-size: 14px;
+  color: var(--text-body);
 }
-
-.logout-btn {
-  color: rgba(255, 255, 255, 0.8) !important;
-  font-size: 14px;
-}
-
-.login-btn {
-  color: #fff !important;
-  border-color: rgba(255, 255, 255, 0.5) !important;
-  background: transparent !important;
-  border-radius: 20px !important;
-}
-
-.register-btn {
-  border-radius: 20px !important;
-  background: rgba(255, 255, 255, 0.2) !important;
-  border-color: transparent !important;
-}
-
-.app-main {
-  flex: 1;
-  padding: 30px 0;
-  background: #f5f7fa;
-}
-
-.app-footer {
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-  padding: 40px 20px;
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.footer-inner {
-  max-width: 1200px;
-  margin: 0 auto;
-  text-align: center;
-}
-
-.footer-brand {
-  font-size: 20px;
-  font-weight: 700;
+.header-cart:hover { border-color: var(--jd-red); color: var(--jd-red); }
+.header-cart__icon { font-size: 20px; }
+.header-cart__badge {
+  position: absolute;
+  top: -6px; right: -6px;
+  background: var(--jd-red);
   color: #fff;
-  margin-bottom: 12px;
+  font-size: 11px;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
 }
 
-.footer-links {
+/* Nav bar */
+.nav-bar { background: #fff; border-bottom: 2px solid var(--jd-red); }
+.nav-bar__inner { display: flex; gap: 0; height: 40px; align-items: stretch; }
+.nav-link {
+  display: flex; align-items: center;
+  padding: 0 18px;
   font-size: 14px;
-  margin-bottom: 16px;
+  color: var(--text-dark);
+  text-decoration: none;
+  font-weight: 500;
+  transition: background 0.15s;
 }
+.nav-link:hover, .nav-link.active { background: var(--jd-red); color: #fff; text-decoration: none; }
 
-.footer-links .dot {
-  margin: 0 10px;
-  color: rgba(255, 255, 255, 0.3);
-}
+/* Main */
+.app-main { flex: 1; padding: 20px 0; }
 
-.footer-copy {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.4);
-}
+/* Footer */
+.app-footer { background: #333; padding: 40px 0 0; color: #999; margin-top: 40px; }
+.footer-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 30px; padding-bottom: 30px; border-bottom: 1px solid #444; }
+.footer-col h4 { color: #fff; font-size: 14px; margin-bottom: 12px; }
+.footer-col p { font-size: 12px; line-height: 2; cursor: pointer; }
+.footer-col p:hover { color: #fff; }
+.footer-bottom { text-align: center; padding: 20px 0; font-size: 12px; color: #666; }
 </style>

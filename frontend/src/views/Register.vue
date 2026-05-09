@@ -1,29 +1,32 @@
 <template>
   <div class="auth-page">
-    <el-card class="auth-card">
-      <div class="auth-header">
-        <span class="auth-icon">&#x1F389;</span>
-        <h2>创建账号</h2>
-        <p>加入智推商城，发现精彩好物</p>
+    <div class="auth-card">
+      <div class="auth-brand">
+        <div class="brand-icon">智推</div>
+        <span class="brand-text">MALL</span>
       </div>
-      <el-form @submit.prevent="handleRegister" class="auth-form">
-        <el-form-item>
-          <el-input v-model="form.username" placeholder="用户名" size="large" prefix-icon="User" />
-        </el-form-item>
-        <el-form-item>
-          <el-input v-model="form.email" type="email" placeholder="邮箱" size="large" prefix-icon="Message" />
-        </el-form-item>
-        <el-form-item>
-          <el-input v-model="form.password" type="password" placeholder="密码" size="large" prefix-icon="Lock" show-password />
-        </el-form-item>
-        <el-button type="primary" native-type="submit" :loading="loading" size="large" round style="width: 100%; margin-top: 8px">
-          注册
-        </el-button>
-      </el-form>
-      <p class="auth-footer">
-        已有账号？<router-link to="/login" class="auth-link">立即登录</router-link>
-      </p>
-    </el-card>
+      <h2 class="auth-title">新用户注册</h2>
+      <form @submit.prevent="handleRegister" class="auth-form">
+        <div class="form-group">
+          <input v-model="form.username" class="form-input" placeholder="请设置用户名" />
+        </div>
+        <div class="form-group">
+          <input v-model="form.email" type="email" class="form-input" placeholder="请输入邮箱" />
+        </div>
+        <div class="form-group">
+          <input v-model="form.password" type="password" class="form-input" placeholder="请设置密码" />
+        </div>
+        <button type="submit" class="auth-submit" :disabled="loading">
+          {{ loading ? '注册中...' : '立即注册' }}
+        </button>
+      </form>
+      <div class="auth-footer">
+        已有账号？<router-link to="/login" class="auth-link">去登录 ›</router-link>
+      </div>
+      <div class="auth-agreement">
+        注册即表示同意 <a href="javascript:;">《用户服务协议》</a> 和 <a href="javascript:;">《隐私政策》</a>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -53,51 +56,21 @@ async function handleRegister() {
 </script>
 
 <style scoped>
-.auth-page {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 60vh;
-}
-
-.auth-card {
-  width: 420px;
-  padding: 20px;
-}
-
-.auth-header {
-  text-align: center;
-  margin-bottom: 24px;
-}
-
-.auth-icon {
-  font-size: 48px;
-  display: block;
-  margin-bottom: 12px;
-}
-
-.auth-header h2 {
-  font-size: 24px;
-  font-weight: 700;
-  color: #1a1a2e;
-  margin-bottom: 4px;
-}
-
-.auth-header p {
-  color: #999;
-  font-size: 14px;
-}
-
-.auth-footer {
-  text-align: center;
-  margin-top: 20px;
-  color: #999;
-  font-size: 14px;
-}
-
-.auth-link {
-  color: #667eea;
-  font-weight: 600;
-  text-decoration: none;
-}
+.auth-page { display: flex; justify-content: center; align-items: center; min-height: 65vh; padding: 40px 20px; }
+.auth-card { width: 380px; background: #fff; border-radius: 8px; padding: 40px 32px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); border: 1px solid var(--border-light); }
+.auth-brand { display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 24px; }
+.brand-icon { background: var(--jd-red); color: #fff; font-size: 16px; font-weight: 800; padding: 4px 8px; border-radius: 4px; }
+.brand-text { font-size: 20px; font-weight: 700; color: var(--text-dark); }
+.auth-title { text-align: center; font-size: 18px; font-weight: 600; color: var(--text-dark); margin-bottom: 24px; }
+.form-group { margin-bottom: 16px; }
+.form-input { width: 100%; height: 44px; padding: 0 14px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; outline: none; transition: border-color 0.15s; }
+.form-input:focus { border-color: var(--jd-red); }
+.auth-submit { width: 100%; height: 44px; background: var(--jd-red); color: #fff; border: none; border-radius: 4px; font-size: 16px; font-weight: 600; cursor: pointer; letter-spacing: 2px; margin-top: 8px; }
+.auth-submit:hover { background: #c91f17; }
+.auth-submit:disabled { opacity: 0.7; cursor: not-allowed; }
+.auth-footer { text-align: center; margin-top: 16px; font-size: 14px; color: var(--text-body); }
+.auth-link { color: var(--jd-red); text-decoration: none; }
+.auth-link:hover { text-decoration: underline; }
+.auth-agreement { margin-top: 20px; font-size: 12px; color: var(--text-light); text-align: center; }
+.auth-agreement a { color: var(--text-body); }
 </style>

@@ -1,6 +1,6 @@
 <template>
   <div class="admin-dashboard">
-    <h2 style="margin-bottom: 24px; font-size: 24px; font-weight: 600">管理后台</h2>
+    <h2 class="page-title">管理后台</h2>
 
     <!-- Stats Cards -->
     <el-row :gutter="20" style="margin-bottom: 24px">
@@ -277,40 +277,17 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.admin-dashboard {
-  max-width: 1400px;
-  margin: 0 auto;
-}
+.admin-dashboard { max-width: 1400px; margin: 0 auto; }
+.page-title { font-size: 20px; font-weight: 700; margin-bottom: 20px; color: var(--text-dark); }
 
-.stat-card {
-  border-radius: 12px !important;
-}
-
-.stat-card__content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.stat-card__label {
-  font-size: 14px;
-  color: #666;
-  margin-bottom: 8px;
-}
-
-.stat-card__value {
-  font-size: 28px;
-  font-weight: 700;
-  margin: 0;
-}
-
-.stat-card__icon {
-  font-size: 40px;
-  opacity: 0.8;
-}
+.stat-card { border: 1px solid var(--border-light) !important; border-radius: 8px !important; }
+.stat-card__content { display: flex; justify-content: space-between; align-items: center; }
+.stat-card__label { font-size: 13px; color: var(--text-light); margin-bottom: 8px; }
+.stat-card__value { font-size: 26px; font-weight: 700; margin: 0; }
+.stat-card__icon { font-size: 36px; opacity: 0.7; }
 
 .stat-card--blue .stat-card__value { color: #409eff; }
 .stat-card--green .stat-card__value { color: #67c23a; }
-.stat-card--orange .stat-card__value { color: #e6a23c; }
-.stat-card--red .stat-card__value { color: #f56c6c; }
+.stat-card--orange .stat-card__value { color: var(--taobao-orange); }
+.stat-card--red .stat-card__value { color: var(--jd-red); }
 </style>

@@ -1,53 +1,90 @@
 <template>
   <div v-if="product" class="detail-page">
-    <el-card class="detail-card">
-      <div class="detail-layout">
-        <div class="detail-image" :style="{ background: gradientColor }">
+    <!-- Breadcrumb -->
+    <div class="breadcrumb">
+      <router-link to="/">首页</router-link>
+      <span> › </span>
+      <span>{{ (product.tags && product.tags[0]) || '全部商品' }}</span>
+      <span> › </span>
+      <span class="breadcrumb-current">{{ product.name }}</span>
+    </div>
+
+    <!-- Product main -->
+    <div class="detail-main">
+      <!-- Left: image -->
+      <div class="detail-left">
+        <div class="detail-img" :style="{ background: gradientColor }">
           <span class="detail-emoji">{{ categoryEmoji }}</span>
         </div>
-        <div class="detail-info">
-          <h1 class="detail-name">{{ product.name }}</h1>
-          <div class="price-box">
-            <span class="price-label">价格</span>
-            <span class="price-value">¥{{ product.price.toFixed(2) }}</span>
+      </div>
+      <!-- Right: info -->
+      <div class="detail-right">
+        <h1 class="detail-name">{{ product.name }}</h1>
+        <p class="detail-desc">{{ product.description }}</p>
+
+        <!-- Price strip -->
+        <div class="price-strip">
+          <div class="price-strip__row">
+            <span class="price-strip__label">促销价</span>
+            <span class="price-symbol" style="font-size:18px">¥</span>
+            <span class="price-main" style="font-size:36px">{{ Math.floor(product.price) }}</span>
+            <span class="price-decimal" style="font-size:18px">.{{ ((product.price % 1) * 100).toFixed(0).padStart(2, '0') }}</span>
+            <span class="price-original" style="margin-left:12px;font-size:14px">¥{{ (product.price * 1.3).toFixed(2) }}</span>
           </div>
-          <p class="detail-desc">{{ product.description }}</p>
-          <div class="detail-meta">
-            <el-tag effect="plain" type="info">库存: {{ product.stock }}</el-tag>
-            <el-tag effect="plain" type="success">已售: {{ product.sales_count }}</el-tag>
-          </div>
-          <div class="detail-actions">
-            <el-button type="primary" size="large" @click="addToCart" round>
-              &#x1F6D2; 加入购物车
-            </el-button>
-            <el-button size="large" round @click="$router.push('/cart')">
-              立即购买
-            </el-button>
+          <div class="price-strip__tags">
+            <span class="promo-tag">满99减10</span>
+            <span class="promo-tag">新人专享</span>
           </div>
         </div>
+
+        <!-- Meta -->
+        <div class="detail-meta">
+          <div class="meta-row"><span class="meta-label">库存</span><span>{{ product.stock }} 件</span></div>
+          <div class="meta-row"><span class="meta-label">已售</span><span>{{ product.sales_count }}+</span></div>
+          <div class="meta-row"><span class="meta-label">运费</span><span style="color:var(--taobao-orange)">包邮</span></div>
+        </div>
+
+        <!-- Quantity -->
+        <div class="detail-qty">
+          <span class="meta-label">数量</span>
+          <el-input-number v-model="quantity" :min="1" :max="product.stock" size="default" />
+        </div>
+
+        <!-- Actions -->
+        <div class="detail-actions">
+          <el-button size="large" class="btn-buy" @click="buyNow">立即购买</el-button>
+          <el-button size="large" class="btn-cart" @click="addToCart">加入购物车</el-button>
+        </div>
       </div>
-    </el-card>
+    </div>
 
-    <el-card class="section-card">
-      <ReviewSection :product-id="product.id" :show-form="!!userStore.user" />
-    </el-card>
+    <!-- Tabs: reviews + QA -->
+    <div class="detail-tabs">
+      <el-tabs v-model="activeTab">
+        <el-tab-pane label="商品评价" name="reviews">
+          <ReviewSection :product-id="product.id" :show-form="!!userStore.user" />
+        </el-tab-pane>
+        <el-tab-pane label="商品问答" name="qa">
+          <QASection :product-id="product.id" :show-form="!!userStore.user" />
+        </el-tab-pane>
+      </el-tabs>
+    </div>
 
-    <el-card class="section-card">
-      <QASection :product-id="product.id" :show-form="!!userStore.user" />
-    </el-card>
-
-    <el-card class="section-card" v-if="similarProducts.length">
-      <h3 class="section-title">相似推荐</h3>
-      <div class="product-grid" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr))">
+    <!-- Similar products -->
+    <div v-if="similarProducts.length" style="margin-top: 20px">
+      <div class="section-header">
+        <span class="section-header__title">看了又看</span>
+      </div>
+      <div class="product-grid">
         <ProductCard v-for="p in similarProducts" :key="p.id" :product="p" />
       </div>
-    </el-card>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { productApi, recommendApi, behaviorApi } from '../api'
 import { useCartStore } from '../stores/cart'
@@ -57,35 +94,29 @@ import ReviewSection from '../components/ReviewSection.vue'
 import QASection from '../components/QASection.vue'
 
 const route = useRoute()
+const router = useRouter()
 const cartStore = useCartStore()
 const userStore = useUserStore()
 const product = ref<any>(null)
 const similarProducts = ref<any[]>([])
+const quantity = ref(1)
+const activeTab = ref('reviews')
 
 const gradients = [
-  'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-  'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-  'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-  'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+  'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+  'linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%)',
+  'linear-gradient(135deg, #d4fc79 0%, #96e6a1 100%)',
+  'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)',
 ]
-
 const emojiMap: Record<string, string> = {
-  '电子产品': '📱', 'electronics': '📱',
-  '服装鞋帽': '👗', 'clothing': '👗',
-  '图书音像': '📚', 'books': '📚',
-  '家居家装': '🏠', 'home': '🏠',
-  '食品饮料': '🍔', 'food': '🍔',
-  '运动户外': '⚽', 'sports': '⚽',
-  '玩具母婴': '🧸', 'toys': '🧸',
-  '美妆个护': '💄', 'beauty': '💄',
-  '汽车用品': '🚗', 'auto': '🚗',
-  '园艺花卉': '🌱', 'garden': '🌱',
+  '电子产品': '📱', '服装鞋帽': '👗', '图书音像': '📚', '家居家装': '🏠',
+  '食品饮料': '🍔', '运动户外': '⚽', '玩具母婴': '🧸', '美妆个护': '💄',
+  '汽车用品': '🚗', '园艺花卉': '🌱',
 }
 
 const gradientColor = computed(() => gradients[(product.value?.id || 0) % gradients.length])
 const categoryEmoji = computed(() => {
-  const tags = product.value?.tags || []
-  for (const t of tags) { if (emojiMap[t]) return emojiMap[t] }
+  for (const t of (product.value?.tags || [])) { if (emojiMap[t]) return emojiMap[t] }
   return '🛍️'
 })
 
@@ -93,6 +124,7 @@ async function load() {
   const id = Number(route.params.id)
   const { data } = await productApi.get(id)
   product.value = data
+  quantity.value = 1
   try {
     const simResp = await recommendApi.similar(id)
     similarProducts.value = simResp.data
@@ -105,101 +137,71 @@ function addToCart() {
   ElMessage.success('已加入购物车')
 }
 
+function buyNow() {
+  cartStore.addItem(product.value)
+  router.push('/cart')
+}
+
 onMounted(load)
 watch(() => route.params.id, load)
 </script>
 
 <style scoped>
-.detail-page {
-  max-width: 960px;
-  margin: 0 auto;
-}
+.detail-page { max-width: 1200px; margin: 0 auto; }
 
-.detail-card {
+.breadcrumb { font-size: 13px; color: var(--text-light); margin-bottom: 16px; }
+.breadcrumb a { color: var(--text-body); text-decoration: none; }
+.breadcrumb a:hover { color: var(--jd-red); }
+.breadcrumb-current { color: var(--text-dark); }
+
+.detail-main {
+  display: flex; gap: 24px; background: #fff;
+  border: 1px solid var(--border-light); border-radius: 8px; padding: 24px;
   margin-bottom: 20px;
 }
 
-.detail-layout {
-  display: flex;
-  gap: 40px;
+.detail-left { flex-shrink: 0; }
+.detail-img {
+  width: 400px; height: 400px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
 }
+.detail-emoji { font-size: 100px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15)); }
 
-.detail-image {
-  width: 360px;
-  height: 360px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+.detail-right { flex: 1; }
+.detail-name { font-size: 20px; font-weight: 700; color: var(--text-dark); line-height: 1.5; margin-bottom: 8px; }
+.detail-desc { font-size: 13px; color: var(--text-body); line-height: 1.6; margin-bottom: 12px; }
+
+.price-strip {
+  background: #fdf0f0; padding: 16px 20px; margin-bottom: 16px; border-radius: 4px;
 }
+.price-strip__row { display: flex; align-items: baseline; }
+.price-strip__label { font-size: 13px; color: var(--text-light); margin-right: 8px; }
+.price-strip__tags { margin-top: 8px; display: flex; gap: 8px; }
+.promo-tag { font-size: 11px; color: var(--jd-red); border: 1px solid var(--jd-red); padding: 1px 6px; border-radius: 3px; }
+.price-symbol { color: var(--price-red); font-weight: 700; }
+.price-main { color: var(--price-red); font-weight: 700; }
+.price-decimal { color: var(--price-red); font-weight: 700; }
+.price-original { color: #bbb; text-decoration: line-through; }
 
-.detail-emoji {
-  font-size: 100px;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
-}
+.detail-meta { margin-bottom: 16px; }
+.meta-row { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid #f5f5f5; font-size: 14px; }
+.meta-label { width: 60px; color: var(--text-light); flex-shrink: 0; }
 
-.detail-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
+.detail-qty { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
 
-.detail-name {
-  font-size: 26px;
-  font-weight: 700;
-  color: #1a1a2e;
-  margin-bottom: 16px;
-}
+.detail-actions { display: flex; gap: 12px; }
+.btn-buy { background: var(--jd-red) !important; color: #fff !important; border: none !important; width: 160px; font-size: 16px !important; font-weight: 600 !important; height: 48px !important; }
+.btn-buy:hover { background: #c91f17 !important; }
+.btn-cart { background: var(--taobao-orange) !important; color: #fff !important; border: none !important; width: 160px; font-size: 16px !important; font-weight: 600 !important; height: 48px !important; }
+.btn-cart:hover { background: #e04600 !important; }
 
-.price-box {
-  background: #fff5f5;
-  padding: 16px 20px;
-  border-radius: 10px;
-  margin-bottom: 16px;
-}
-
-.price-label {
-  font-size: 13px;
-  color: #999;
-  margin-right: 8px;
-}
-
-.price-value {
-  font-size: 32px;
-  font-weight: 800;
-  color: #e74c3c;
-}
-
-.detail-desc {
-  color: #666;
-  line-height: 1.6;
-  margin-bottom: 16px;
-}
-
-.detail-meta {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 24px;
-}
-
-.detail-actions {
-  display: flex;
-  gap: 12px;
-}
-
-.section-card {
-  margin-bottom: 20px;
+.detail-tabs {
+  background: #fff; border: 1px solid var(--border-light); border-radius: 8px;
+  padding: 20px; margin-bottom: 20px;
 }
 
 @media (max-width: 768px) {
-  .detail-layout {
-    flex-direction: column;
-  }
-  .detail-image {
-    width: 100%;
-    height: 240px;
-  }
+  .detail-main { flex-direction: column; }
+  .detail-img { width: 100%; height: 260px; }
 }
 </style>
