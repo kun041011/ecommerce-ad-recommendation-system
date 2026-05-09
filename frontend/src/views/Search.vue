@@ -25,23 +25,30 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { productApi } from '../api'
 import ProductCard from '../components/ProductCard.vue'
 
 const route = useRoute()
-const query = ref((route.query.q as string) || '')
+const query = ref((route.query.q as string) || (route.query.category as string) || '')
 const products = ref<any[]>([])
 const searched = ref(false)
 
 async function search() {
-  const { data } = await productApi.search({ query: query.value })
+  const params: Record<string, any> = {}
+  if (query.value) params.query = query.value
+  const { data } = await productApi.search(params)
   products.value = data.items || []
   searched.value = true
 }
 
 onMounted(() => { if (query.value) search() })
+
+watch(() => route.query, () => {
+  query.value = (route.query.q as string) || (route.query.category as string) || ''
+  if (query.value) search()
+})
 </script>
 
 <style scoped>

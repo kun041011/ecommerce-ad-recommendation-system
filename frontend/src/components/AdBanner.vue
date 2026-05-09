@@ -13,14 +13,17 @@
 </template>
 
 <script setup lang="ts">
+import { useRouter } from 'vue-router'
 import { adApi } from '../api'
 
 const props = defineProps<{ ad: any }>()
+const router = useRouter()
 
 function handleClick() {
   adApi.impression({ ad_id: props.ad.id, impression_type: 'click' })
   if (props.ad.target_url) {
-    window.location.href = props.ad.target_url
+    const url = new URL(props.ad.target_url, window.location.origin)
+    router.push({ path: url.pathname, query: Object.fromEntries(url.searchParams) })
   }
 }
 </script>
