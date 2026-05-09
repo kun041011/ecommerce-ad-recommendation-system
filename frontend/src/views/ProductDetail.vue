@@ -70,6 +70,16 @@
       </el-tabs>
     </div>
 
+    <!-- Ad recommendation strip -->
+    <div v-if="sideAds.length" class="detail-ad-strip">
+      <div class="detail-ad-strip__header">
+        <span>🔥 热门推荐</span>
+      </div>
+      <div class="detail-ad-strip__list">
+        <AdBanner v-for="ad in sideAds" :key="ad.id" :ad="ad" />
+      </div>
+    </div>
+
     <!-- Similar products -->
     <div v-if="similarProducts.length" style="margin-top: 20px">
       <div class="section-header">
@@ -86,7 +96,8 @@
 import { ref, onMounted, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { productApi, recommendApi, behaviorApi } from '../api'
+import { productApi, recommendApi, behaviorApi, adApi } from '../api'
+import AdBanner from '../components/AdBanner.vue'
 import { useCartStore } from '../stores/cart'
 import { useUserStore } from '../stores/user'
 import ProductCard from '../components/ProductCard.vue'
@@ -99,6 +110,7 @@ const cartStore = useCartStore()
 const userStore = useUserStore()
 const product = ref<any>(null)
 const similarProducts = ref<any[]>([])
+const sideAds = ref<any[]>([])
 const quantity = ref(1)
 const activeTab = ref('reviews')
 
@@ -126,8 +138,13 @@ async function load() {
   product.value = data
   quantity.value = 1
   try {
-    const simResp = await recommendApi.similar(id)
+    const [simResp, adResp] = await Promise.all([
+      recommendApi.similar(id),
+      adApi.fetch(),
+    ])
     similarProducts.value = simResp.data
+    sideAds.value = (adResp.data.ads || []).slice(0, 3)
+    sideAds.value.forEach((ad: any) => { adApi.impression({ ad_id: ad.id, impression_type: 'show' }) })
     await behaviorApi.track({ product_id: id, behavior_type: 'view' })
   } catch {}
 }
@@ -198,6 +215,27 @@ watch(() => route.params.id, load)
 .detail-tabs {
   background: #fff; border: 1px solid var(--border-light); border-radius: 8px;
   padding: 20px; margin-bottom: 20px;
+}
+
+.detail-ad-strip {
+  background: #fff;
+  border: 2px solid #ff9800;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+.detail-ad-strip__header {
+  font-size: 16px;
+  font-weight: 700;
+  color: #e1251b;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #ffeee6;
+}
+.detail-ad-strip__list {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
 }
 
 @media (max-width: 768px) {

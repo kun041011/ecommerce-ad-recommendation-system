@@ -43,6 +43,11 @@
       </div>
     </div>
 
+    <!-- Top banner ad -->
+    <div v-if="ads.length" class="banner-ad-section">
+      <AdBanner :ad="ads[0]" :wide="true" />
+    </div>
+
     <!-- Recommended products + ads -->
     <div class="section-header" v-if="products.length">
       <span class="section-header__title">📦 为你推荐</span>
@@ -53,6 +58,11 @@
         <AdBanner v-if="item.type === 'ad'" :ad="item.data" />
         <ProductCard v-else :product="item.data" />
       </template>
+    </div>
+
+    <!-- Bottom banner ad -->
+    <div v-if="ads.length > 1" class="banner-ad-section" style="margin-top: 20px">
+      <AdBanner :ad="ads[ads.length > 1 ? 1 : 0]" :wide="true" />
     </div>
 
     <!-- Empty / login prompt -->
@@ -108,11 +118,11 @@ function getEmoji(p: any) {
 
 const displayItems = computed(() => {
   const items: { type: string; data: any }[] = []
-  let adIdx = 0
+  let adIdx = 2
   for (let i = 0; i < products.value.length; i++) {
     items.push({ type: 'product', data: products.value[i] })
-    if ((i + 1) % 5 === 0 && adIdx < ads.value.length) {
-      items.push({ type: 'ad', data: ads.value[adIdx++] })
+    if ((i + 1) % 3 === 0 && adIdx < ads.value.length) {
+      items.push({ type: 'ad', data: ads.value[adIdx++ % ads.value.length] })
     }
   }
   return items
@@ -173,4 +183,7 @@ onUnmounted(() => { if (slideTimer) clearInterval(slideTimer) })
 .flash-card__info { padding: 10px 12px; }
 .flash-card__name { font-size: 13px; color: var(--text-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 6px; }
 .flash-card__price { display: flex; align-items: baseline; }
+
+/* Banner ad section */
+.banner-ad-section { margin-bottom: 24px; }
 </style>
