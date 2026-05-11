@@ -74,40 +74,48 @@ def figure_placeholder(caption):
     doc.add_paragraph()
 
 
-def _set_cell_border(cell, top=None, bottom=None, start=None, end=None):
-    """Set individual cell borders. Each param is a dict like {'sz': '12', 'val': 'single', 'color': '000000'}."""
-    tc = cell._tc
-    tcPr = tc.get_or_add_tcPr()
-    tcBorders = tcPr.find(qn('w:tcBorders'))
-    if tcBorders is None:
-        from lxml import etree
-        tcBorders = etree.SubElement(tcPr, qn('w:tcBorders'))
-    for edge, data in [('top', top), ('bottom', bottom), ('start', start), ('end', end)]:
-        if data is None:
-            # Remove border (set to none)
-            from lxml import etree
-            el = etree.SubElement(tcBorders, qn('w:' + edge))
-            el.set(qn('w:val'), 'none')
-            el.set(qn('w:sz'), '0')
-            el.set(qn('w:space'), '0')
-            el.set(qn('w:color'), 'auto')
-        else:
-            from lxml import etree
-            el = etree.SubElement(tcBorders, qn('w:' + edge))
-            for k, v in data.items():
-                el.set(qn('w:' + k), v)
-
-
 def add_table(headers, rows):
-    """Create a three-line table (三线表): top border, header-bottom border, table-bottom border only."""
+    """Create a three-line table (三线表): only top thick, header-bottom thin, bottom thick. No vertical lines."""
+    from lxml import etree
+
     num_rows = 1 + len(rows)
     num_cols = len(headers)
     table = doc.add_table(rows=num_rows, cols=num_cols)
-    table.style = 'Table Grid'
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
 
-    thick = {'sz': '12', 'val': 'single', 'color': '000000'}
-    thin = {'sz': '6', 'val': 'single', 'color': '000000'}
+    # Remove ALL default borders from the table style by setting tblBorders to none
+    tbl = table._tbl
+    tblPr = tbl.tblPr if tbl.tblPr is not None else etree.SubElement(tbl, qn('w:tblPr'))
+    # Remove existing tblBorders
+    for old in tblPr.findall(qn('w:tblBorders')):
+        tblPr.remove(old)
+    # Set all table-level borders to none
+    tblBorders = etree.SubElement(tblPr, qn('w:tblBorders'))
+    for edge in ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']:
+        el = etree.SubElement(tblBorders, qn('w:' + edge))
+        el.set(qn('w:val'), 'none')
+        el.set(qn('w:sz'), '0')
+        el.set(qn('w:space'), '0')
+        el.set(qn('w:color'), 'auto')
+
+    # Now set only the three lines via cell borders
+    thick = {'val': 'single', 'sz': '12', 'space': '0', 'color': '000000'}
+    thin = {'val': 'single', 'sz': '6', 'space': '0', 'color': '000000'}
+    none_b = {'val': 'none', 'sz': '0', 'space': '0', 'color': 'auto'}
+
+    def set_cell_borders(cell, top_d, bottom_d):
+        tc = cell._tc
+        tcPr = tc.get_or_add_tcPr()
+        # Remove old borders
+        for old in tcPr.findall(qn('w:tcBorders')):
+            tcPr.remove(old)
+        tcBorders = etree.SubElement(tcPr, qn('w:tcBorders'))
+        for edge_name, data in [('top', top_d), ('bottom', bottom_d),
+                                ('start', none_b), ('end', none_b),
+                                ('insideH', none_b), ('insideV', none_b)]:
+            el = etree.SubElement(tcBorders, qn('w:' + edge_name))
+            for k, v in data.items():
+                el.set(qn('w:' + k), v)
 
     # Fill header row
     for i, h in enumerate(headers):
@@ -118,6 +126,8 @@ def add_table(headers, rows):
             for run in p.runs:
                 run.bold = True
                 run.font.size = Pt(10)
+                run.font.name = '宋体'
+                run.element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
 
     # Fill data rows
     for ri, row in enumerate(rows):
@@ -128,20 +138,19 @@ def add_table(headers, rows):
                 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 for run in p.runs:
                     run.font.size = Pt(10)
+                    run.font.name = '宋体'
+                    run.element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
 
-    # Apply three-line borders to every cell
+    # Apply three-line borders cell by cell
     for ri in range(num_rows):
         for ci in range(num_cols):
             cell = table.rows[ri].cells[ci]
             if ri == 0:
-                # Header row: thick top, thin bottom, no left/right
-                _set_cell_border(cell, top=thick, bottom=thin, start=None, end=None)
+                set_cell_borders(cell, top_d=thick, bottom_d=thin)
             elif ri == num_rows - 1:
-                # Last row: no top, thick bottom, no left/right
-                _set_cell_border(cell, top=None, bottom=thick, start=None, end=None)
+                set_cell_borders(cell, top_d=none_b, bottom_d=thick)
             else:
-                # Middle rows: no borders
-                _set_cell_border(cell, top=None, bottom=None, start=None, end=None)
+                set_cell_borders(cell, top_d=none_b, bottom_d=none_b)
 
     doc.add_paragraph()
 
@@ -210,7 +219,7 @@ p.paragraph_format.first_line_indent = Cm(0.74)
 run = p.add_run('关键词：')
 run.bold = True
 run.font.size = Pt(12)
-run = p.add_run('推荐系统；广告频控；用户活跃度；社区反馈')
+run = p.add_run('推荐系统  广告频控  用户活跃度  社区反馈')
 run.font.size = Pt(12)
 
 doc.add_page_break()
