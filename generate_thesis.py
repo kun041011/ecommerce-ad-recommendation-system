@@ -74,19 +74,52 @@ def figure_placeholder(caption):
     doc.add_paragraph()
 
 
+def _set_cell_border(cell, top=None, bottom=None, start=None, end=None):
+    """Set individual cell borders. Each param is a dict like {'sz': '12', 'val': 'single', 'color': '000000'}."""
+    tc = cell._tc
+    tcPr = tc.get_or_add_tcPr()
+    tcBorders = tcPr.find(qn('w:tcBorders'))
+    if tcBorders is None:
+        from lxml import etree
+        tcBorders = etree.SubElement(tcPr, qn('w:tcBorders'))
+    for edge, data in [('top', top), ('bottom', bottom), ('start', start), ('end', end)]:
+        if data is None:
+            # Remove border (set to none)
+            from lxml import etree
+            el = etree.SubElement(tcBorders, qn('w:' + edge))
+            el.set(qn('w:val'), 'none')
+            el.set(qn('w:sz'), '0')
+            el.set(qn('w:space'), '0')
+            el.set(qn('w:color'), 'auto')
+        else:
+            from lxml import etree
+            el = etree.SubElement(tcBorders, qn('w:' + edge))
+            for k, v in data.items():
+                el.set(qn('w:' + k), v)
+
+
 def add_table(headers, rows):
-    table = doc.add_table(rows=1 + len(rows), cols=len(headers))
+    """Create a three-line table (三线表): top border, header-bottom border, table-bottom border only."""
+    num_rows = 1 + len(rows)
+    num_cols = len(headers)
+    table = doc.add_table(rows=num_rows, cols=num_cols)
     table.style = 'Table Grid'
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
-    hdr = table.rows[0]
+
+    thick = {'sz': '12', 'val': 'single', 'color': '000000'}
+    thin = {'sz': '6', 'val': 'single', 'color': '000000'}
+
+    # Fill header row
     for i, h in enumerate(headers):
-        cell = hdr.cells[i]
+        cell = table.rows[0].cells[i]
         cell.text = h
         for p in cell.paragraphs:
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             for run in p.runs:
                 run.bold = True
                 run.font.size = Pt(10)
+
+    # Fill data rows
     for ri, row in enumerate(rows):
         for ci, val in enumerate(row):
             cell = table.rows[ri + 1].cells[ci]
@@ -95,6 +128,21 @@ def add_table(headers, rows):
                 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 for run in p.runs:
                     run.font.size = Pt(10)
+
+    # Apply three-line borders to every cell
+    for ri in range(num_rows):
+        for ci in range(num_cols):
+            cell = table.rows[ri].cells[ci]
+            if ri == 0:
+                # Header row: thick top, thin bottom, no left/right
+                _set_cell_border(cell, top=thick, bottom=thin, start=None, end=None)
+            elif ri == num_rows - 1:
+                # Last row: no top, thick bottom, no left/right
+                _set_cell_border(cell, top=None, bottom=thick, start=None, end=None)
+            else:
+                # Middle rows: no borders
+                _set_cell_border(cell, top=None, bottom=None, start=None, end=None)
+
     doc.add_paragraph()
 
 
