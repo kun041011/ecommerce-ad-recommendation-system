@@ -1,92 +1,132 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""Generate the graduation thesis as a .docx file."""
+"""Generate the graduation thesis as a .docx file.
+Format: 长春理工大学计算机科学技术学院本科毕业设计格式规范 (v5 reference).
+"""
 
 from docx import Document
-from docx.shared import Pt, Cm, RGBColor
+from docx.shared import Pt, Cm, Emu, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml.ns import qn
 
 doc = Document()
 
+# ── Page setup (A4, margins per CUST spec) ──
+for section in doc.sections:
+    section.page_width = Emu(7560310)
+    section.page_height = Emu(10692130)
+    section.top_margin = Cm(2.54)
+    section.bottom_margin = Cm(2.54)
+    section.left_margin = Cm(3.17)
+    section.right_margin = Cm(3.17)
+
+# ── Normal style: Times New Roman + 宋体, 12pt, justify, indent 1cm, 1.25 line spacing ──
 style = doc.styles['Normal']
 font = style.font
-font.name = '宋体'
+font.name = 'Times New Roman'
 font.size = Pt(12)
 style.element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
 pf = style.paragraph_format
-pf.line_spacing = 1.5
+pf.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+pf.line_spacing = 1.25
 pf.space_after = Pt(0)
+pf.first_line_indent = Cm(1.0)
 
 
 def heading1(text):
+    """第X章 标题 — 宋体 16pt bold, center, no indent."""
     p = doc.add_heading(text, level=1)
-    for run in p.runs:
-        run.font.name = '黑体'
-        run.element.rPr.rFonts.set(qn('w:eastAsia'), '黑体')
-        run.font.size = Pt(18)
-        run.font.color.rgb = RGBColor(0, 0, 0)
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p.paragraph_format.first_line_indent = None
+    for run in p.runs:
+        run.font.name = '宋体'
+        run.element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
+        run.font.size = Pt(16)
+        run.font.bold = True
+        run.font.color.rgb = RGBColor(0, 0, 0)
 
 
 def heading2(text):
+    """X.X 标题 — 宋体 14pt bold, left, no indent."""
     p = doc.add_heading(text, level=2)
+    p.paragraph_format.first_line_indent = None
     for run in p.runs:
-        run.font.name = '黑体'
-        run.element.rPr.rFonts.set(qn('w:eastAsia'), '黑体')
-        run.font.size = Pt(15)
+        run.font.name = '宋体'
+        run.element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
+        run.font.size = Pt(14)
+        run.font.bold = True
         run.font.color.rgb = RGBColor(0, 0, 0)
 
 
 def heading3(text):
+    """X.X.X 标题 — 宋体 12pt bold, with indent."""
     p = doc.add_heading(text, level=3)
+    p.paragraph_format.first_line_indent = Cm(1.0)
     for run in p.runs:
-        run.font.name = '黑体'
-        run.element.rPr.rFonts.set(qn('w:eastAsia'), '黑体')
-        run.font.size = Pt(13)
+        run.font.name = '宋体'
+        run.element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
+        run.font.size = Pt(12)
+        run.font.bold = True
         run.font.color.rgb = RGBColor(0, 0, 0)
 
 
 def para(text):
+    """Normal paragraph — Times New Roman + 宋体 12pt, justify, 1cm indent."""
     p = doc.add_paragraph()
-    p.paragraph_format.first_line_indent = Cm(0.74)
+    p.paragraph_format.first_line_indent = Cm(1.0)
     run = p.add_run(text)
-    run.font.name = '宋体'
+    run.font.name = 'Times New Roman'
     run.element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
     run.font.size = Pt(12)
 
 
-def formula_placeholder(formula_id, formula_text):
-    """Insert a formula placeholder for MathType insertion."""
+def table_caption(text):
+    """表题 — 宋体 五号(10.5pt), center, above table."""
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p.paragraph_format.first_line_indent = None
+    run = p.add_run(text)
+    run.font.name = '宋体'
+    run.element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
+    run.font.size = Pt(10.5)
+
+
+def formula_placeholder(formula_id, formula_text):
+    """Insert a formula placeholder for MathType insertion — centered with right-aligned number."""
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p.paragraph_format.first_line_indent = None
     run = p.add_run('【MathType公式占位】' + formula_text)
-    run.font.size = Pt(11)
+    run.font.size = Pt(12)
+    run.font.name = 'Times New Roman'
     run.font.color.rgb = RGBColor(100, 100, 100)
     run.italic = True
-    # Right-aligned formula number
-    run2 = p.add_run('          ' + formula_id)
+    run2 = p.add_run('\t' + formula_id)
     run2.font.size = Pt(12)
+    run2.font.name = 'Times New Roman'
     run2.font.color.rgb = RGBColor(0, 0, 0)
     run2.italic = False
 
 
 def figure_placeholder(caption):
-    """Insert a bordered placeholder for a figure with caption."""
+    """Insert figure placeholder with caption BELOW (per CUST spec: 图题在图下)."""
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p.add_run('\n\n【此处插入流程图：' + caption + '】\n（见 docs/figures.md 中对应的 Mermaid 源码，用 Visio 绘制后插入）\n\n')
-    run.font.size = Pt(11)
+    p.paragraph_format.first_line_indent = None
+    run = p.add_run('\n\n【此处插入流程图】\n（见 docs/figures.md 中对应的 Mermaid 源码，用 Visio 绘制后插入）\n\n')
+    run.font.size = Pt(10.5)
+    run.font.name = '宋体'
+    run.element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
     run.font.color.rgb = RGBColor(128, 128, 128)
-    run.italic = True
-    # Add figure caption below
+    # Caption below figure (宋体 五号 10.5pt, center)
     cap = doc.add_paragraph()
     cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    cap.paragraph_format.first_line_indent = None
     run2 = cap.add_run(caption)
-    run2.font.size = Pt(10)
-    run2.bold = True
-    doc.add_paragraph()
+    run2.font.size = Pt(10.5)
+    run2.font.name = '宋体'
+    run2.element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
 
 
 def add_table(headers, rows):
@@ -140,7 +180,7 @@ def add_table(headers, rows):
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             for run in p.runs:
                 run.bold = True
-                run.font.size = Pt(10)
+                run.font.size = Pt(10.5)
                 run.font.name = '宋体'
                 run.element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
 
@@ -152,7 +192,7 @@ def add_table(headers, rows):
             for p in cell.paragraphs:
                 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 for run in p.runs:
-                    run.font.size = Pt(10)
+                    run.font.size = Pt(10.5)
                     run.font.name = '宋体'
                     run.element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
 
@@ -171,29 +211,48 @@ def add_table(headers, rows):
 
 
 # ════════════════════════════════════════════════
-# 封面
+# 封面 (matching v5 template)
 # ════════════════════════════════════════════════
-for _ in range(6):
+p = doc.add_paragraph()
+p.paragraph_format.first_line_indent = None
+run = p.add_run('编号')
+run.font.name = '宋体'
+run.element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
+run.font.size = Pt(10.5)
+
+for _ in range(4):
     doc.add_paragraph()
 
 p = doc.add_paragraph()
 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-run = p.add_run('本科毕业论文（设计）')
+p.paragraph_format.first_line_indent = None
+run = p.add_run('本科生毕业设计')
 run.font.size = Pt(26)
 run.bold = True
 run.font.name = '黑体'
 run.element.rPr.rFonts.set(qn('w:eastAsia'), '黑体')
 
-doc.add_paragraph()
+for _ in range(2):
+    doc.add_paragraph()
+
+p = doc.add_paragraph()
+p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+p.paragraph_format.first_line_indent = None
+run = p.add_run('基于社区数据反馈的电商广告推荐系统的设计与实现')
+run.font.size = Pt(22)
+run.bold = True
+run.font.name = '宋体'
+run.element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
+
 doc.add_paragraph()
 
 p = doc.add_paragraph()
 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-run = p.add_run('基于社区数据反馈的电商广告推荐系统\n的设计与实现')
-run.font.size = Pt(22)
+p.paragraph_format.first_line_indent = None
+run = p.add_run('Design and Implementation of E-commerce Advertising\nRecommendation System Based on Community Data Feedback')
+run.font.size = Pt(16)
 run.bold = True
-run.font.name = '黑体'
-run.element.rPr.rFonts.set(qn('w:eastAsia'), '黑体')
+run.font.name = 'Times New Roman'
 
 for _ in range(4):
     doc.add_paragraph()
@@ -204,14 +263,81 @@ for line in [
     '学    号：      _______________            ',
     '姓    名：      _______________            ',
     '指导教师：      _______________            ',
-    '完成日期：      2026年5月                  ',
 ]:
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p.paragraph_format.first_line_indent = None
     run = p.add_run(line)
     run.font.size = Pt(14)
     run.font.name = '宋体'
     run.element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
+
+doc.add_paragraph()
+
+p = doc.add_paragraph()
+p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+p.paragraph_format.first_line_indent = None
+run = p.add_run('二〇二六年五月')
+run.font.size = Pt(18)
+run.bold = True
+run.font.name = '宋体'
+run.element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
+
+doc.add_page_break()
+
+# ════════════════════════════════════════════════
+# 原创承诺书
+# ════════════════════════════════════════════════
+p = doc.add_paragraph()
+p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+p.paragraph_format.first_line_indent = None
+run = p.add_run('毕业设计（论文）原创承诺书')
+run.font.size = Pt(16)
+run.bold = True
+run.font.name = '仿宋'
+run.element.rPr.rFonts.set(qn('w:eastAsia'), '仿宋')
+
+doc.add_paragraph()
+
+commitment_items = [
+    '1．本人承诺：所呈交的毕业设计（论文）《基于社区数据反馈的电商广告推荐系统的设计与实现》，是认真学习理解学校的《长春理工大学本科毕业设计（论文）工作条例》后，在教师的指导下，保质保量独立地完成了任务书中规定的内容，不弄虚作假，不抄袭别人的工作内容。',
+    '2．本人在毕业设计（论文）中引用他人的观点和研究成果，均在文中加以注释或以参考文献形式列出，对本文的研究工作做出重要贡献的个人和集体均已在文中注明。',
+    '3．在毕业设计（论文）中对侵犯任何方面知识产权的行为，由本人承担相应的法律责任。',
+    '4．本人完全了解学校关于保存、使用毕业设计（论文）的规定，即：按照学校要求提交论文和相关材料的印刷本和电子版本；同意学校保留毕业设计（论文）的复印件和电子版本，允许被查阅和借阅；学校可以采用影印、缩印或其他复制手段保存毕业设计（论文），可以公布其中的全部或部分内容。',
+]
+for item in commitment_items:
+    p = doc.add_paragraph()
+    p.paragraph_format.first_line_indent = Cm(1.0)
+    run = p.add_run(item)
+    run.font.size = Pt(14)
+    run.font.name = '仿宋'
+    run.element.rPr.rFonts.set(qn('w:eastAsia'), '仿宋')
+
+doc.add_paragraph()
+
+p = doc.add_paragraph()
+p.paragraph_format.first_line_indent = Cm(1.0)
+run = p.add_run('以上承诺的法律结果将完全由本人承担！')
+run.font.size = Pt(14)
+run.font.name = '仿宋'
+run.element.rPr.rFonts.set(qn('w:eastAsia'), '仿宋')
+
+for _ in range(3):
+    doc.add_paragraph()
+
+p = doc.add_paragraph()
+p.paragraph_format.first_line_indent = None
+run = p.add_run('作 者 签 名：')
+run.font.size = Pt(14)
+run.font.name = '仿宋'
+run.element.rPr.rFonts.set(qn('w:eastAsia'), '仿宋')
+
+p = doc.add_paragraph()
+p.paragraph_format.first_line_indent = None
+run = p.add_run('      年    月    日')
+run.font.size = Pt(14)
+run.font.name = '仿宋'
+run.element.rPr.rFonts.set(qn('w:eastAsia'), '仿宋')
 
 doc.add_page_break()
 
@@ -230,12 +356,16 @@ para(
 )
 
 p = doc.add_paragraph()
-p.paragraph_format.first_line_indent = Cm(0.74)
+p.paragraph_format.first_line_indent = None
 run = p.add_run('关键词：')
 run.bold = True
 run.font.size = Pt(12)
+run.font.name = '黑体'
+run.element.rPr.rFonts.set(qn('w:eastAsia'), '黑体')
 run = p.add_run('推荐系统  广告频控  用户活跃度  社区反馈')
 run.font.size = Pt(12)
+run.font.name = '宋体'
+run.element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
 
 doc.add_page_break()
 
@@ -257,12 +387,14 @@ para(
 )
 
 p = doc.add_paragraph()
-p.paragraph_format.first_line_indent = Cm(0.74)
-run = p.add_run('Keywords: ')
+p.paragraph_format.first_line_indent = None
+run = p.add_run('Keywords：')
 run.bold = True
 run.font.size = Pt(12)
+run.font.name = 'Times New Roman'
 run = p.add_run('Recommendation System; Ad Frequency Control; User Activity; Community Feedback')
 run.font.size = Pt(12)
+run.font.name = 'Times New Roman'
 
 doc.add_page_break()
 
@@ -276,7 +408,7 @@ doc.add_page_break()
 # ════════════════════════════════════════════════
 # 第一章 绪论
 # ════════════════════════════════════════════════
-heading1('第一章 绪论')
+heading1('第1章 绪论')
 
 heading2('1.1 研究背景与意义')
 
@@ -325,7 +457,7 @@ doc.add_page_break()
 # ════════════════════════════════════════════════
 # 第二章 相关技术与理论基础
 # ════════════════════════════════════════════════
-heading1('第二章 相关技术与理论基础')
+heading1('第2章 相关技术与理论基础')
 
 heading2('2.1 协同过滤算法')
 
@@ -401,6 +533,7 @@ para('λ参数的选择需要在敏感度和稳定性之间取平衡：λ值越�
 
 heading2('2.7 技术栈')
 
+table_caption('表 2.1 系统技术栈')
 add_table(
     ['层次', '技术', '用途'],
     [
@@ -423,7 +556,7 @@ doc.add_page_break()
 # ════════════════════════════════════════════════
 # 第三章 需求分析与总体设计（围绕题目，8-10页）
 # ════════════════════════════════════════════════
-heading1('第三章 需求分析与总体设计')
+heading1('第3章 需求分析与总体设计')
 
 heading2('3.1 系统需求分析')
 
@@ -471,6 +604,7 @@ para('1. 广告管理。商家角色可创建广告、设置出价（CPC/CPM）�
 
 para('2. 频控策略。系统根据用户活跃度等级确定三组差异化参数：')
 
+table_caption('表 3.1 频控策略矩阵')
 add_table(
     ['活跃度等级', '评分范围', '每页广告数', '最小间隔(秒)', '每日上限'],
     [
@@ -524,6 +658,7 @@ figure_placeholder('图3-1 系统整体架构图')
 
 heading3('3.2.2 模块划分与职责')
 
+table_caption('表 3.2 系统模块划分与职责')
 add_table(
     ['模块', '子模块', '核心职责'],
     [
@@ -564,6 +699,7 @@ heading3('3.2.4 接口设计')
 
 para('系统API遵循RESTful风格，按模块组织为9组路由：')
 
+table_caption('表 3.3 系统API接口设计')
 add_table(
     ['模块', '路径前缀', '核心接口'],
     [
@@ -626,12 +762,13 @@ doc.add_page_break()
 # ════════════════════════════════════════════════
 # 第四章 详细设计与实现
 # ════════════════════════════════════════════════
-heading1('第四章 详细设计与实现')
+heading1('第4章 详细设计与实现')
 
 heading2('4.1 数据库详细设计')
 
 heading3('4.1.1 用户表')
 
+table_caption('表 4.1 users表结构')
 add_table(
     ['字段', '类型', '约束', '说明'],
     [
@@ -648,6 +785,7 @@ add_table(
 
 heading3('4.1.2 商品表')
 
+table_caption('表 4.2 products表结构')
 add_table(
     ['字段', '类型', '约束', '说明'],
     [
@@ -665,6 +803,7 @@ add_table(
 
 heading3('4.1.3 广告表与展示日志表')
 
+table_caption('表 4.3 ads表结构')
 add_table(
     ['字段', '类型', '说明'],
     [
@@ -683,6 +822,7 @@ add_table(
 
 heading3('4.1.4 行为日志表')
 
+table_caption('表 4.4 user_behaviors表结构')
 add_table(
     ['字段', '类型', '说明'],
     [
@@ -844,10 +984,11 @@ doc.add_page_break()
 # ════════════════════════════════════════════════
 # 第五章 系统测试与分析
 # ════════════════════════════════════════════════
-heading1('第五章 系统测试与分析')
+heading1('第5章 系统测试与分析')
 
 heading2('5.1 测试环境')
 
+table_caption('表 5.1 测试环境配置')
 add_table(
     ['项目', '配置'],
     [
@@ -909,6 +1050,7 @@ para('6. 管理后台：请求仪表盘数据，验证统计指标。')
 
 heading2('5.4 性能测试')
 
+table_caption('表 5.2 性能测试结果')
 add_table(
     ['测试项', '方法', '目标', '结果', '达标'],
     [
@@ -919,6 +1061,7 @@ add_table(
 
 heading2('5.5 测试结果汇总')
 
+table_caption('表 5.3 测试结果汇总')
 add_table(
     ['类型', '用例数', '通过', '跳过', '失败'],
     [
@@ -949,7 +1092,7 @@ doc.add_page_break()
 # ════════════════════════════════════════════════
 # 第六章 总结与展望
 # ════════════════════════════════════════════════
-heading1('第六章 总结与展望')
+heading1('第6章 总结与展望')
 
 heading2('6.1 研究成果')
 
@@ -1020,9 +1163,11 @@ refs = [
 
 for ref in refs:
     p = doc.add_paragraph()
+    p.paragraph_format.first_line_indent = None
     run = p.add_run(ref)
-    run.font.size = Pt(11)
+    run.font.size = Pt(10.5)
     run.font.name = 'Times New Roman'
+    run.element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
 
 doc.add_page_break()
 
