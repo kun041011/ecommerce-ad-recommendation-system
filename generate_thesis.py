@@ -537,17 +537,12 @@ table_caption('表 2.1 系统技术栈')
 add_table(
     ['层次', '技术', '用途'],
     [
-        ['后端框架', 'FastAPI', '高性能异步REST API'],
-        ['ORM', 'SQLAlchemy 2.0', '数据库对象映射'],
-        ['数据验证', 'Pydantic v2', '请求/响应模型验证'],
-        ['认证', 'JWT (python-jose)', '无状态身份认证'],
-        ['推荐算法', 'scikit-learn', '协同过滤/矩阵分解'],
-        ['深度学习', 'PyTorch', 'DeepFM/DIN模型'],
-        ['前端框架', 'Vue 3 + TypeScript', '单页应用'],
-        ['UI组件', 'Element Plus', '企业级组件库'],
-        ['可视化', 'ECharts', '管理后台图表'],
-        ['数据库', 'SQLite', '轻量级关系型存储'],
-        ['测试', 'pytest', '单元/集成/性能测试'],
+        ['后端', 'FastAPI + SQLAlchemy + Pydantic', 'REST API / ORM / 数据验证'],
+        ['推荐/ML', 'scikit-learn + PyTorch', '协同过滤 / DeepFM / DIN'],
+        ['前端', 'Vue 3 + Element Plus + ECharts', 'SPA / UI组件 / 数据可视化'],
+        ['认证', 'JWT (python-jose) + bcrypt', '无状态认证 / 密码加密'],
+        ['存储', 'SQLite + Redis', '持久化 / 缓存计数'],
+        ['测试', 'pytest + httpx', '单元 / 集成 / 性能测试'],
     ]
 )
 
@@ -658,26 +653,16 @@ figure_placeholder('图3-1 系统整体架构图')
 
 heading3('3.2.2 模块划分与职责')
 
-table_caption('表 3.2 系统模块划分与职责')
+table_caption('表 3.2 系统核心模块与职责')
 add_table(
-    ['模块', '子模块', '核心职责'],
+    ['模块', '核心职责'],
     [
-        ['电商模块', '用户服务', '注册、登录、JWT认证、角色管理'],
-        ['', '商品服务', '商品CRUD、多条件搜索、分类管理'],
-        ['', '订单服务', '下单、库存校验扣减、订单状态管理'],
-        ['', '行为追踪', '记录浏览/点击/搜索/加购/购买行为'],
-        ['社区模块', '评价服务', '发表评价、评分、有用点赞'],
-        ['', '问答服务', '提问、回答'],
-        ['推荐引擎', '召回层', 'UserCF、ItemCF、Content-Based、ALS、Hot'],
-        ['', '排序层', 'DeepFM、DIN深度模型'],
-        ['', '重排层', 'MMR多样性重排、已购/已展示过滤'],
-        ['', '流水线', '编排召回→排序→重排的执行流程'],
-        ['广告引擎', '竞价排序', 'eCPM = bid × pCTR排序'],
-        ['', '频控组件', '基于活跃度等级的三级频控策略'],
-        ['', '计费模块', 'CPC/CPM扣费、预算控制'],
-        ['活跃度引擎', '评分计算', '行为权重 × 时间衰减的加权求和'],
-        ['', '等级划分', '高(≥60)/普通(20~60)/低(<20)'],
-        ['数据分析', '仪表盘', 'CTR/RPM/留存率/活跃度分布统计'],
+        ['电商模块', '用户认证、商品CRUD与搜索、订单管理、行为追踪'],
+        ['社区模块', '商品评价(1-5星)、商品问答、有用点赞'],
+        ['推荐引擎', '多路召回(UserCF/ItemCF/ALS等)→深度排序(DeepFM/DIN)→MMR重排'],
+        ['广告引擎', 'eCPM竞价排序、频控组件(三级策略)、CPC/CPM计费'],
+        ['活跃度引擎', '行为加权×时间衰减评分、高/普通/低三级划分'],
+        ['数据分析', '管理后台仪表盘(CTR/RPM/活跃度分布)'],
     ]
 )
 
@@ -699,19 +684,16 @@ heading3('3.2.4 接口设计')
 
 para('系统API遵循RESTful风格，按模块组织为9组路由：')
 
-table_caption('表 3.3 系统API接口设计')
+table_caption('表 3.3 核心API接口设计')
 add_table(
     ['模块', '路径前缀', '核心接口'],
     [
-        ['认证', '/api/auth', 'POST register, POST login, GET me'],
-        ['商品', '/api/products', 'GET list, GET /{id}, GET /search, POST, PUT'],
-        ['订单', '/api/orders', 'POST create, GET list, GET /{id}'],
-        ['推荐', '/api/recommend', 'GET /home, GET /similar/{id}, GET /for-you'],
-        ['广告', '/api/ads', 'GET /fetch(含频控), POST /impression, POST create'],
-        ['评价', '/api/reviews', 'POST create, GET /product/{id}, POST /{id}/helpful'],
-        ['问答', '/api/qa', 'POST create, GET /product/{id}, POST /{id}/answer'],
-        ['活跃度', '/api/activity', 'GET /my-score'],
-        ['分析', '/api/analytics', 'GET /dashboard, GET /activity-dist, GET /ad-performance'],
+        ['认证', '/api/auth', 'register, login, me'],
+        ['商品/订单', '/api/products, /api/orders', 'CRUD, 搜索, 下单'],
+        ['推荐', '/api/recommend', 'home, similar, for-you'],
+        ['广告', '/api/ads', 'fetch(含频控), impression, create'],
+        ['社区', '/api/reviews, /api/qa', '评价, 问答, 点赞'],
+        ['活跃度/分析', '/api/activity, /api/analytics', '评分查询, 仪表盘数据'],
     ]
 )
 
@@ -766,74 +748,42 @@ heading1('第4章 详细设计与实现')
 
 heading2('4.1 数据库详细设计')
 
+para('系统共设计10张数据表，以下列出与本文核心功能（广告频控和活跃度）最相关的两张表。')
+
 heading3('4.1.1 用户表')
 
-table_caption('表 4.1 users表结构')
-add_table(
-    ['字段', '类型', '约束', '说明'],
-    [
-        ['id', 'Integer', 'PK', '自增主键'],
-        ['username', 'String(50)', 'UNIQUE', '用户名'],
-        ['email', 'String(120)', 'UNIQUE', '邮箱'],
-        ['hashed_password', 'String(255)', 'NOT NULL', 'bcrypt哈希密码'],
-        ['role', 'Enum', 'DEFAULT consumer', '角色'],
-        ['activity_score', 'Float', 'DEFAULT 0.0', '活跃度评分(0-100)'],
-        ['ad_frequency_level', 'Enum', 'DEFAULT normal', '广告频率等级'],
-        ['created_at', 'DateTime', 'DEFAULT now()', '注册时间'],
-    ]
-)
+para('users表包含活跃度评分（activity_score）和广告频率等级（ad_frequency_level）两个关键字段，是频控组件的数据依据。')
 
-heading3('4.1.2 商品表')
-
-table_caption('表 4.2 products表结构')
-add_table(
-    ['字段', '类型', '约束', '说明'],
-    [
-        ['id', 'Integer', 'PK', '自增主键'],
-        ['name', 'String(200)', 'NOT NULL', '商品名称'],
-        ['description', 'Text', '', '描述'],
-        ['price', 'Float', 'NOT NULL', '价格'],
-        ['category_id', 'Integer', 'FK→categories', '分类'],
-        ['merchant_id', 'Integer', 'FK→users', '商家'],
-        ['stock', 'Integer', 'DEFAULT 0', '库存'],
-        ['sales_count', 'Integer', 'DEFAULT 0', '销量'],
-        ['tags', 'JSON', 'NULLABLE', '标签（用于召回）'],
-    ]
-)
-
-heading3('4.1.3 广告表与展示日志表')
-
-table_caption('表 4.3 ads表结构')
+table_caption('表 4.1 users表核心字段')
 add_table(
     ['字段', '类型', '说明'],
     [
-        ['id', 'Integer PK', '广告主键'],
-        ['advertiser_id', 'FK→users', '广告主'],
-        ['title', 'String(200)', '广告标题'],
-        ['bid_amount', 'Float', '出价'],
-        ['bid_type', 'Enum(CPC/CPM)', '计费模式'],
-        ['daily_budget', 'Float', '日预算'],
-        ['total_budget', 'Float', '总预算'],
-        ['spent_amount', 'Float', '已消耗'],
-        ['target_tags', 'JSON', '定向标签'],
-        ['status', 'Enum', '状态(active/paused/exhausted)'],
+        ['id / username / email', 'Integer / String', '主键、用户名（唯一）、邮箱（唯一）'],
+        ['hashed_password', 'String(255)', 'bcrypt加密密码'],
+        ['role', 'Enum', '角色：consumer / merchant / admin'],
+        ['activity_score', 'Float', '活跃度评分（0-100），频控核心字段'],
+        ['ad_frequency_level', 'Enum', '广告频率等级：high / normal / low'],
     ]
 )
 
-heading3('4.1.4 行为日志表')
+heading3('4.1.2 行为日志表')
 
-table_caption('表 4.4 user_behaviors表结构')
+para('user_behaviors表是推荐引擎和活跃度引擎的共同数据源，记录用户在电商和社区中的所有行为。')
+
+table_caption('表 4.2 user_behaviors表结构')
 add_table(
     ['字段', '类型', '说明'],
     [
-        ['id', 'Integer PK', '主键'],
-        ['user_id', 'FK→users', '用户'],
-        ['product_id', 'FK→products', '商品（可空）'],
+        ['id', 'Integer PK', '自增主键'],
+        ['user_id', 'FK→users', '行为用户'],
+        ['product_id', 'FK→products', '关联商品（搜索/登录时为空）'],
         ['behavior_type', 'Enum', 'view/click/cart/purchase/review/search/login'],
-        ['context', 'JSON', '上下文（来源页面、搜索词等）'],
-        ['created_at', 'DateTime', '行为时间'],
+        ['context', 'JSON', '上下文信息（来源页面、搜索词等）'],
+        ['created_at', 'DateTime', '行为发生时间（用于时间衰减计算）'],
     ]
 )
+
+para('其他数据表包括：products（商品）、categories（分类）、orders/order_items（订单）、ads（广告配置）、ad_impressions（展示日志）、reviews（评价）、qa（问答），此处不再逐一列出其字段结构。')
 
 heading2('4.2 推荐引擎实现')
 
