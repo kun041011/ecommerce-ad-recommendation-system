@@ -1,11 +1,51 @@
-# 论文流程图（Mermaid 源码）
+# 论文插图说明
 
-简洁清晰版本，每张图控制在5-8个节点，A4打印清晰可读。
-用 Visio 按以下逻辑绘制，开始/结束用椭圆，处理用矩形，判断用菱形。
+共12张图，包含流程图（Mermaid源码，用Visio绘制）和截图（运行系统后截取）。
 
 ---
 
-## 图3-1 系统整体架构图
+## 流程图（用Visio绘制）
+
+### 图2-1 DeepFM模型结构图
+
+```mermaid
+graph TB
+    A[输入特征] --> B[Embedding层]
+    B --> C[FM层<br/>二阶交叉]
+    B --> D[DNN层<br/>高阶交叉]
+    C --> E[求和]
+    D --> E
+    E --> F[Sigmoid]
+    F --> G[pCTR输出]
+```
+
+---
+
+### 图3-1 系统用例图
+
+```mermaid
+graph LR
+    subgraph 消费者
+        A1[浏览商品]
+        A2[搜索商品]
+        A3[下单购买]
+        A4[发表评价]
+        A5[查看活跃度]
+    end
+    subgraph 商家
+        B1[管理商品]
+        B2[创建广告]
+        B3[查看广告效果]
+    end
+    subgraph 管理员
+        C1[查看仪表盘]
+        C2[分析活跃度分布]
+    end
+```
+
+---
+
+### 图3-2 系统整体架构图
 
 ```mermaid
 graph TB
@@ -19,7 +59,7 @@ graph TB
 
 ---
 
-## 图3-2 推荐流程图
+### 图3-3 推荐流程图
 
 ```mermaid
 flowchart TB
@@ -35,7 +75,7 @@ flowchart TB
 
 ---
 
-## 图3-3 广告频控流程图
+### 图3-4 广告频控流程图
 
 ```mermaid
 flowchart TB
@@ -50,7 +90,26 @@ flowchart TB
 
 ---
 
-## 图4-1 活跃度评分流程图
+### 图3-5 数据库E-R关系图
+
+```mermaid
+erDiagram
+    users ||--o{ orders : "下单"
+    users ||--o{ reviews : "评价"
+    users ||--o{ user_behaviors : "行为"
+    users ||--o{ ads : "投放"
+    products ||--o{ reviews : "被评价"
+    products ||--o{ user_behaviors : "被浏览"
+    categories ||--o{ products : "分类"
+    orders ||--o{ order_items : "包含"
+    products ||--o{ order_items : "被购买"
+    ads ||--o{ ad_impressions : "展示"
+    users ||--o{ ad_impressions : "看到"
+```
+
+---
+
+### 图4-1 活跃度评分流程图
 
 ```mermaid
 flowchart TB
@@ -66,9 +125,38 @@ flowchart TB
 
 ---
 
+## 截图（运行系统后截取）
+
+以下图片需要启动前后端系统，在浏览器中截取：
+
+### 图4-2 系统首页界面截图
+- 启动后端：`cd backend && uvicorn app.main:app --port 8000`
+- 启动前端：`cd frontend && npm run dev`
+- 登录账号 user_0 / user123
+- 在浏览器中截取首页，包含推荐商品流和穿插的广告卡片
+
+### 图4-3 商品详情页界面截图
+- 点击任意商品进入详情页
+- 截图包含：商品信息、价格、评价区域、问答区域、广告推荐区
+
+### 图4-4 管理后台数据分析界面截图
+- 登录管理员账号 admin / admin123
+- 进入 /admin 页面
+- 截图包含：统计卡片、活跃度饼图、广告效果排行图、频控策略图
+
+### 图5-1 单元测试执行结果截图
+- 运行：`cd backend && python -m pytest tests/ -v --tb=short`
+- 截取终端输出，显示测试用例列表和 "77 passed, 4 skipped"
+
+### 图5-2 集成测试执行结果截图
+- 运行：`cd backend && python -m pytest tests/test_integration.py -v`
+- 截取终端输出，显示6个集成测试全部通过
+
+---
+
 ## 使用说明
 
-1. 复制 Mermaid 代码到 https://mermaid.live/ 预览
-2. 在 Visio 中按逻辑绘制：椭圆=开始/结束，矩形=处理，菱形=判断
-3. 导出为图片插入 Word 对应占位位置
-4. 图片宽度建议12-14cm，居中排列
+1. 流程图：复制Mermaid代码到 https://mermaid.live/ 预览，然后在Visio中按逻辑绘制
+2. 截图：启动系统后在浏览器/终端中截取，建议宽度12-14cm
+3. 全部图片居中排列，图题在图片下方
+4. 图序号格式："图X-Y 名称"
