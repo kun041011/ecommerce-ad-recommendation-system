@@ -976,7 +976,7 @@ doc.add_page_break()
 # ════════════════════════════════════════════════
 # 附录
 # ════════════════════════════════════════════════
-heading1('附录 系统界面与测试截图')
+heading1('附录1 系统界面与测试截图')
 
 para('本附录展示系统的核心界面截图和测试执行结果截图，供审阅参考。')
 
@@ -1007,6 +1007,202 @@ para('附图6展示了在终端执行pytest测试套件的输出结果，共77�
 figure_placeholder('附图7 集成测试执行结果')
 
 para('附图7展示了6个集成测试用例的执行结果，覆盖完整购买流程、社区互动流程、广告频控流程、活跃度更新、推荐API和管理后台数据接口等端到端测试场景，全部通过。')
+
+doc.add_page_break()
+
+# ════════════════════════════════════════════════
+# 附录2 关键代码
+# ════════════════════════════════════════════════
+heading1('附录2 关键源代码')
+
+para('本附录列出系统核心模块的关键源代码，包括活跃度评分引擎、频控组件、广告竞价与计费、协同过滤召回、MMR多样性重排以及广告投放服务等模块的完整实现。')
+
+
+def code_block(title, code_text):
+    """Insert a code listing with title."""
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p.paragraph_format.first_line_indent = None
+    run = p.add_run(title)
+    run.font.name = '宋体'
+    run.element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
+    run.font.size = Pt(10.5)
+    run.bold = True
+
+    p2 = doc.add_paragraph()
+    p2.paragraph_format.first_line_indent = None
+    p2.paragraph_format.line_spacing = 1.0
+    run2 = p2.add_run(code_text)
+    run2.font.name = 'Consolas'
+    run2.font.size = Pt(9)
+    doc.add_paragraph()
+
+
+code_block('代码1 活跃度评分引擎（app/activity/scorer.py）', r"""import math
+from datetime import datetime, timezone
+
+BEHAVIOR_WEIGHTS = {
+    "login": 2, "view": 1, "search": 1, "cart": 3,
+    "purchase": 10, "review": 5, "answer": 5, "helpful": 2,
+}
+DECAY_LAMBDA = 0.1
+
+def time_decay(days_ago: float) -> float:
+    return math.exp(-DECAY_LAMBDA * days_ago)
+
+def calculate_activity_score(behaviors):
+    now = datetime.now(timezone.utc)
+    score = 0.0
+    for b in behaviors:
+        weight = BEHAVIOR_WEIGHTS.get(b["behavior_type"], 0)
+        created = b["created_at"]
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        days_ago = (now - created).total_seconds() / 86400
+        score += weight * time_decay(max(0, days_ago))
+    return min(100.0, round(score, 2))
+
+def classify_activity_level(score: float) -> str:
+    if score >= 60:
+        return "high"
+    elif score >= 20:
+        return "normal"
+    return "low"
+""")
+
+code_block('代码2 频控组件（app/ad_engine/frequency.py）', r"""import time
+from dataclasses import dataclass
+
+@dataclass
+class FrequencyPolicy:
+    ads_per_page: int
+    min_interval_sec: int
+    daily_cap: int
+
+POLICIES = {
+    "high":   FrequencyPolicy(ads_per_page=3, min_interval_sec=60,  daily_cap=50),
+    "normal": FrequencyPolicy(ads_per_page=2, min_interval_sec=120, daily_cap=30),
+    "low":    FrequencyPolicy(ads_per_page=1, min_interval_sec=300, daily_cap=10),
+}
+
+def get_policy(activity_level: str) -> FrequencyPolicy:
+    return POLICIES.get(activity_level, POLICIES["normal"])
+
+class FrequencyController:
+    def check(self, user_id, activity_level, today_count, last_shown_ts):
+        policy = get_policy(activity_level)
+        if today_count >= policy.daily_cap:
+            return {"allowed": False, "reason": "daily_cap_reached", "max_ads": 0}
+        now = time.time()
+        if last_shown_ts > 0 and (now - last_shown_ts) < policy.min_interval_sec:
+            return {"allowed": False, "reason": "min_interval_not_met", "max_ads": 0}
+        remaining = policy.daily_cap - today_count
+        max_ads = min(policy.ads_per_page, remaining)
+        return {"allowed": True, "reason": "ok", "max_ads": max_ads}
+""")
+
+code_block('代码3 eCPM竞价排序（app/ad_engine/bidding.py）', r"""def compute_ecpm(ad: dict) -> float:
+    if ad["bid_type"] == "CPM":
+        return ad["bid_amount"]
+    return ad["bid_amount"] * ad.get("pctr", 0.01) * 1000
+
+def rank_ads_by_ecpm(ads):
+    for ad in ads:
+        ad["ecpm"] = compute_ecpm(ad)
+    return sorted(ads, key=lambda a: a["ecpm"], reverse=True)
+""")
+
+code_block('代码4 CPC/CPM计费（app/ad_engine/billing.py）', r"""def calculate_cpc_charge(current_pctr: float, next_ecpm: float) -> float:
+    if current_pctr <= 0:
+        return 0.01
+    charge = next_ecpm / current_pctr / 1000 + 0.01
+    return round(charge, 4)
+
+def calculate_cpm_charge(bid_amount: float) -> float:
+    return round(bid_amount / 1000, 4)
+""")
+
+code_block('代码5 基于用户的协同过滤召回（app/recommendation/recall/user_cf.py）', r"""import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+
+class UserCF:
+    def __init__(self):
+        self.user_sim_matrix = None
+        self.interaction_matrix = None
+
+    def fit(self, interaction_matrix: np.ndarray):
+        self.interaction_matrix = interaction_matrix
+        self.user_sim_matrix = cosine_similarity(interaction_matrix)
+        np.fill_diagonal(self.user_sim_matrix, 0)
+
+    def recommend(self, user_idx, n=10, exclude_interacted=True):
+        if self.user_sim_matrix is None:
+            return []
+        sim_scores = self.user_sim_matrix[user_idx]
+        weighted_scores = sim_scores @ self.interaction_matrix
+        if exclude_interacted:
+            interacted = self.interaction_matrix[user_idx] > 0
+            weighted_scores[interacted] = -1
+        top_indices = np.argsort(weighted_scores)[::-1][:n]
+        return [int(i) for i in top_indices if weighted_scores[i] > 0]
+""")
+
+code_block('代码6 MMR多样性重排（app/recommendation/rerank/diversity.py）', r"""def mmr_rerank(items, n=10, lambda_param=0.5):
+    if not items:
+        return []
+    selected = [items[0]]
+    remaining = items[1:]
+    while len(selected) < n and remaining:
+        best_score = -float("inf")
+        best_idx = 0
+        for i, item in enumerate(remaining):
+            relevance = item.get("score", 0)
+            max_sim = max(
+                (1.0 if item.get("category") == s.get("category") else 0.0)
+                for s in selected
+            )
+            mmr_score = lambda_param * relevance - (1 - lambda_param) * max_sim
+            if mmr_score > best_score:
+                best_score = mmr_score
+                best_idx = i
+        selected.append(remaining.pop(best_idx))
+    return selected
+""")
+
+code_block('代码7 广告投放服务——频控集成（app/services/ad_service.py核心函数）', r"""def fetch_ads_for_user(db, user):
+    # 1. 计算用户活跃度
+    behaviors = db.query(UserBehavior).filter(
+        UserBehavior.user_id == user.id).all()
+    behavior_dicts = [{"behavior_type": b.behavior_type.value,
+                       "created_at": b.created_at} for b in behaviors]
+    score = calculate_activity_score(behavior_dicts)
+    level = classify_activity_level(score)
+
+    # 2. 查询频控状态
+    today_count = db.query(AdImpression).filter(
+        AdImpression.user_id == user.id,
+        AdImpression.impression_type == ImpressionType.show).count()
+    last_imp = db.query(AdImpression).filter(
+        AdImpression.user_id == user.id,
+        AdImpression.impression_type == ImpressionType.show
+    ).order_by(AdImpression.created_at.desc()).first()
+    last_ts = last_imp.created_at.timestamp() if last_imp else 0
+
+    # 3. 频控判断
+    freq_result = freq_controller.check(user.id, level, today_count, last_ts)
+    if not freq_result["allowed"]:
+        return {"ads": [], "frequency_level": level, "remaining_today": 0}
+
+    # 4. eCPM竞价排序
+    active_ads = db.query(Ad).filter(Ad.status == AdStatus.active).all()
+    ad_dicts = [{"id": a.id, "bid_amount": a.bid_amount,
+                 "bid_type": a.bid_type.value, "pctr": 0.05, "ad": a}
+                for a in active_ads]
+    ranked = rank_ads_by_ecpm(ad_dicts)
+    selected = [r["ad"] for r in ranked[:freq_result["max_ads"]]]
+    return {"ads": selected, "frequency_level": level,
+            "remaining_today": freq_result["max_ads"]}
+""")
 
 doc.add_page_break()
 
