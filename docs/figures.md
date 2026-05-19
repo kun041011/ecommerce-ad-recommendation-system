@@ -92,20 +92,55 @@ flowchart TB
 
 ### 图3-5 数据库E-R关系图
 
-```mermaid
-erDiagram
-    users ||--o{ orders : "下单"
-    users ||--o{ reviews : "评价"
-    users ||--o{ user_behaviors : "行为"
-    users ||--o{ ads : "投放"
-    products ||--o{ reviews : "被评价"
-    products ||--o{ user_behaviors : "被浏览"
-    categories ||--o{ products : "分类"
-    orders ||--o{ order_items : "包含"
-    products ||--o{ order_items : "被购买"
-    ads ||--o{ ad_impressions : "展示"
-    users ||--o{ ad_impressions : "看到"
+用Visio绘制，矩形表示实体，菱形表示关系，标注1和N。
+
 ```
+    ┌──────────┐    1:N     ┌──────────┐    N:1     ┌──────────┐
+    │ Category │───────────→│ Product  │←───────────│  User    │
+    └──────────┘            └──────────┘  (merchant) └──────────┘
+                                │                       │
+                           N:1  │                       │ 1:N
+                                ↓                       ↓
+                          ┌──────────┐            ┌──────────┐
+                          │  Review  │            │  Order   │
+                          └──────────┘            └──────────┘
+                                                       │ 1:N
+                                                       ↓
+          ┌──────────┐                           ┌──────────────┐
+          │   Ad     │←── 1:N ── User            │  OrderItem   │
+          └──────────┘                           └──────────────┘
+               │ 1:N                                   ↑ N:1
+               ↓                                  Product
+         ┌──────────────┐
+         │ AdImpression │←── N:1 ── User
+         └──────────────┘
+
+          ┌────────────────┐
+          │ UserBehavior   │←── N:1 ── User
+          └────────────────┘←── N:1 ── Product
+
+          ┌──────────┐
+          │   QA     │←── N:1 ── User, Product
+          └──────────┘
+```
+
+关系说明（标在连线上）：
+- Category → Product：1:N（一个分类下多个商品）
+- User → Product：1:N（一个商家发布多个商品）
+- User → Order：1:N（一个用户多个订单）
+- Order → OrderItem：1:N（一个订单多个商品项）
+- Product → OrderItem：1:N（一个商品出现在多个订单项）
+- User → Review：1:N（一个用户多条评价）
+- Product → Review：1:N（一个商品多条评价）
+- User → Ad：1:N（一个商家多条广告）
+- Ad → AdImpression：1:N（一条广告多次展示）
+- User → AdImpression：1:N（一个用户多次看到广告）
+- User → UserBehavior：1:N（一个用户多条行为）
+- Product → UserBehavior：1:N（一个商品被多次浏览）
+- User → QA：1:N（一个用户多条问答）
+- Product → QA：1:N（一个商品多条问答）
+
+注：Order与Product通过OrderItem构成N:N（多对多）关系
 
 ---
 
