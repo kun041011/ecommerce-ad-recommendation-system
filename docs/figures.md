@@ -49,62 +49,16 @@ graph LR
 
 ```mermaid
 graph TB
-    subgraph 表现层
-        F1[首页/搜索/详情页]
-        F2[购物车/订单]
-        F3[个人中心/活跃度仪表盘]
-        F4[商家后台]
-        F5[管理后台/ECharts可视化]
-    end
-
-    subgraph 接口层
-        A1[认证 /api/auth]
-        A2[商品 /api/products]
-        A3[订单 /api/orders]
-        A4[推荐 /api/recommend]
-        A5[广告 /api/ads]
-        A6[社区 /api/reviews, /api/qa]
-        A7[行为 /api/behavior]
-        A8[活跃度 /api/activity]
-        A9[分析 /api/analytics]
-    end
-
-    subgraph 业务逻辑层
-        S1[认证服务<br/>JWT + bcrypt]
-        S2[商品服务]
-        S3[订单服务]
-        S4[社区服务]
-        S5[广告服务]
-    end
-
-    subgraph 算法引擎层
-        subgraph 推荐引擎
-            R1[召回: UserCF / ItemCF<br/>ContentBased / ALS / Hot]
-            R2[排序: DeepFM / DIN]
-            R3[重排: MMR多样性]
-        end
-        subgraph 广告引擎
-            AD1[eCPM竞价排序]
-            AD2[频控组件<br/>三级策略]
-            AD3[CPC/CPM计费]
-        end
-        subgraph 活跃度引擎
-            AC1[行为加权评分]
-            AC2[时间衰减函数]
-            AC3[等级划分<br/>high/normal/low]
-        end
-    end
-
-    subgraph 数据层
-        DB1[(SQLite<br/>10张核心表)]
-        DB2[(Redis<br/>缓存/计数)]
-    end
-
-    表现层 -->|HTTP REST API| 接口层
-    接口层 --> 业务逻辑层
-    业务逻辑层 --> 算法引擎层
-    AC3 -->|活跃度等级| AD2
-    算法引擎层 --> 数据层
+    A[前端 Vue 3 + Element Plus] -->|REST API| B[接口层 FastAPI 9组路由]
+    B --> C[业务逻辑层<br/>认证/商品/订单/社区/广告服务]
+    C --> D[推荐引擎<br/>召回→排序→重排]
+    C --> E[广告引擎<br/>eCPM竞价 + 频控 + 计费]
+    C --> F[活跃度引擎<br/>行为加权 + 时间衰减 + 等级划分]
+    F -->|活跃度等级| E
+    D --> G[(SQLite 10张表)]
+    E --> G
+    F --> G
+    C --> H[(Redis 缓存/计数)]
 ```
 
 ---
