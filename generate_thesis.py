@@ -804,6 +804,16 @@ para('RecommendationPipeline类编排完整的推荐流程，其run方法接收�
 
 para('对于无历史行为的新用户，流水线在召回阶段检测到用户交互矩阵为空后，直接跳过协同过滤和排序步骤，返回热门召回结果作为冷启动推荐。随着新用户产生浏览、购买等行为数据，系统会在下次推荐请求时自动切换到完整的多路召回流程，逐步提供个性化推荐。')
 
+para('推荐引擎的核心类结构如图5-2所示，整个引擎围绕RecommendationPipeline类进行顶层编排，由召回层、排序层和重排层三组类协同完成推荐任务。召回层包含UserCF、ItemCF、ContentBased、ALSModel和HotRecall五个类，每个类均实现fit和recommend方法（HotRecall仅实现recommend），分别负责模型训练和候选集生成。排序层包含DeepFMModel和DINModel两个PyTorch模型类，各自实现forward和predict方法，分别用于模型前向传播和批量预测打分。重排层通过mmr_rerank函数实现多样性控制。')
+
+figure_placeholder('图5-2 推荐引擎核心类图')
+
+para('从类间依赖关系来看，RecommendationPipeline持有所有召回类和排序类的实例引用，在run方法中依次调用各召回类的recommend方法获取候选集，再调用排序类的predict方法进行精排打分，最后调用mmr_rerank函数完成多样性重排。这种分层解耦的设计使得每个召回策略和排序模型可以独立开发、测试和替换，新增召回算法只需实现fit和recommend接口即可无缝集成到流水线中。')
+
+para('个性化推荐请求的完整处理时序如图5-3所示，展示了从前端发起请求到返回推荐结果的全过程函数调用链路。该时序图详细描述了推荐流水线内部各组件的调用顺序和数据流转过程，帮助理解系统在处理单次推荐请求时的运行机制。')
+
+figure_placeholder('图5-3 个性化推荐请求时序图')
+
 heading2('5.3 广告系统实现')
 
 heading3('5.3.1 竞价排序')
@@ -817,6 +827,16 @@ para('CPC扣费采用GSP机制：charge = next_eCPM / current_pCTR / 1000 + 0.01
 heading3('5.3.3 广告投放流程')
 
 para('fetch_ads_for_user函数实现完整的广告投放流程，串联了活跃度计算、频控判断和竞价排序三个环节。首先从行为日志表中读取当前用户的所有行为记录，调用活跃度引擎计算评分并划分等级；然后查询用户今日的广告展示总数和上次展示时间戳，传入频控组件进行综合判断。若频控不允许展示（日上限已达或间隔不足），直接返回空广告列表；若允许展示，则查询所有处于active状态的广告，计算每条广告的eCPM值进行降序排序，截取频控允许数量的Top广告返回给前端进行混排展示。')
+
+para('广告引擎的核心类结构如图5-4所示，以AdService类为入口统一编排广告投放的全部流程。AdService通过fetch_ads_for_user方法对外提供服务，内部依赖ActivityScorer、FrequencyController和Bidding三个组件类分别完成活跃度评估、频控决策和竞价排序。ActivityScorer类负责用户活跃度的量化计算，提供calculate_activity_score和classify_activity_level两个核心方法。FrequencyController类封装频控判断逻辑，其check方法根据用户活跃度等级查找对应的FrequencyPolicy数据对象，该对象以dataclass形式定义了ads_per_page、min_interval_sec和daily_cap三项频控参数。')
+
+figure_placeholder('图5-4 广告引擎类图')
+
+para('从依赖关系来看，AdService处于调用链的顶层，依次调用ActivityScorer获取用户活跃度等级，调用FrequencyController获取频控决策结果，最后调用Bidding模块的compute_ecpm和rank_ads_by_ecpm方法完成广告竞价排序。Billing类独立于投放流程，在广告被实际展示或点击后由计费定时任务调用，通过calculate_cpc_charge和calculate_cpm_charge方法分别计算CPC和CPM两种计费模式下的扣费金额。这种职责分离的设计确保了投放决策和计费扣款两个流程互不干扰。')
+
+para('广告获取接口的完整请求处理时序如图5-5所示，详细展示了GET /api/ads/fetch接口从接收请求到返回广告列表的全部函数调用过程。该时序图清晰呈现了活跃度引擎、频控组件和竞价排序三个子系统的协作关系，以及频控条件判断的两条分支路径。')
+
+figure_placeholder('图5-5 广告获取接口时序图')
 
 heading2('5.4 频控组件实现')
 
@@ -853,6 +873,10 @@ para('POST /api/behavior/track接口负责记录用户的实时行为数据，�
 para('每次接口调用首先通过JWT令牌验证用户身份，然后创建一条UserBehavior记录写入user_behaviors表，同时记录精确到秒的时间戳。写入完成后返回行为记录ID和确认信息。接口设计为异步非阻塞模式，确保行为上报不影响前端页面的交互响应速度。')
 
 para('该接口由前端在关键用户操作时自动调用：进入商品详情页时上报view事件，提交搜索时上报search事件，点击加入购物车时上报cart事件，提交订单后上报purchase事件，发表评价时上报review事件。这些行为数据在系统中承担双重角色——作为推荐引擎的训练数据源驱动个性化推荐，同时作为活跃度引擎的计算输入影响广告频控策略，是整个系统数据闭环的关键环节。')
+
+para('行为追踪与活跃度反馈的完整数据闭环时序如图5-6所示，该时序图展示了从用户浏览商品触发行为上报，到行为数据被活跃度引擎消费并影响广告频控决策的全过程。整个闭环分为两个阶段：第一阶段是行为数据采集，前端在用户浏览商品时调用POST /api/behavior/track接口，经JWT身份验证后将行为记录写入数据库；第二阶段是数据消费与决策，当广告请求到达时，系统从数据库读取该用户的全部行为记录，依次通过calculate_activity_score计算活跃度评分、classify_activity_level划分活跃度等级、FrequencyController.check执行频控判断，最终根据活跃度等级决定广告的展示策略和数量。')
+
+figure_placeholder('图5-6 行为追踪与活跃度反馈时序图')
 
 heading3('5.6.3 推荐接口')
 
