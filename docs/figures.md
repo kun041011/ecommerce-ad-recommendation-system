@@ -219,39 +219,19 @@ classDiagram
 sequenceDiagram
     participant 前端
     participant API as API层
-    participant Pipeline as RecommendationPipeline
-    participant UCF as UserCF
-    participant ICF as ItemCF
-    participant CB as ContentBased
-    participant ALS as ALSModel
-    participant Hot as HotRecall
-    participant DFM as DeepFMModel
-    participant DIN as DINModel
+    participant Pipeline as Pipeline
+    participant Rank as DeepFM/DIN
     participant MMR as mmr_rerank
 
     前端->>API: GET /api/recommend/home
-    API->>Pipeline: run(user_id, limit=20)
-    par 多路并行召回
-        Pipeline->>UCF: recommend(user_id, 20)
-        UCF-->>Pipeline: candidates_1
-        Pipeline->>ICF: recommend(user_id, 20)
-        ICF-->>Pipeline: candidates_2
-        Pipeline->>CB: recommend(user_id, 20)
-        CB-->>Pipeline: candidates_3
-        Pipeline->>ALS: recommend(user_id, 20)
-        ALS-->>Pipeline: candidates_4
-        Pipeline->>Hot: recommend(20)
-        Hot-->>Pipeline: candidates_5
-    end
-    Pipeline->>Pipeline: merge & deduplicate candidates
-    Pipeline->>DFM: predict(merged_candidates)
-    DFM-->>Pipeline: scores_deepfm
-    Pipeline->>DIN: predict(merged_candidates)
-    DIN-->>Pipeline: scores_din
-    Pipeline->>Pipeline: weighted_average(scores_deepfm, scores_din)
-    Pipeline->>MMR: mmr_rerank(scored_items, lambda)
-    MMR-->>Pipeline: final_list
-    Pipeline-->>API: Top-N recommendations
+    API->>Pipeline: run(user_id, 20)
+    Pipeline->>Pipeline: 多路召回(UserCF/ItemCF/CB/ALS/Hot)
+    Pipeline->>Pipeline: 合并去重候选集
+    Pipeline->>Rank: predict(candidates)
+    Rank-->>Pipeline: pCTR分数
+    Pipeline->>MMR: mmr_rerank(scored_items)
+    MMR-->>Pipeline: 多样性重排结果
+    Pipeline-->>API: Top-N列表
     API-->>前端: 推荐结果JSON
 ```
 
@@ -300,34 +280,21 @@ classDiagram
 sequenceDiagram
     participant 前端
     participant API as API层
-    participant DB as 数据库
-    participant AS as ActivityScorer
+    participant Scorer as ActivityScorer
     participant FC as FrequencyController
-    participant BD as Bidding
+    participant Bid as Bidding
 
     前端->>API: GET /api/ads/fetch
-    API->>DB: query user_behaviors(user_id)
-    DB-->>API: behaviors列表
-    API->>AS: calculate_activity_score(behaviors)
-    AS-->>API: score
-    API->>AS: classify_activity_level(score)
-    AS-->>API: level(high/normal/low)
-    API->>DB: query ad_impressions(user_id, today)
-    DB-->>API: today_count, last_ts
-    API->>FC: check(user_id, level, today_count, last_ts)
-    FC-->>API: decision
-    alt 不允许展示(daily_cap或interval不足)
-        API-->>前端: ads=[], frequency_level, remaining=0
+    API->>Scorer: calculate_activity_score(behaviors)
+    Scorer-->>API: score → classify → level
+    API->>FC: check(level, today_count, last_ts)
+    FC-->>API: allow/deny, max_ads
+    alt 不允许展示
+        API-->>前端: 空广告列表
     else 允许展示
-        API->>DB: query active ads
-        DB-->>API: ads列表
-        loop 每条广告
-            API->>BD: compute_ecpm(ad, pctr)
-            BD-->>API: ecpm值
-        end
-        API->>BD: rank_ads_by_ecpm(ads)
-        BD-->>API: sorted_ads
-        API-->>前端: top_ads, frequency_level, remaining_today
+        API->>Bid: rank_ads_by_ecpm(ads)
+        Bid-->>API: sorted_ads
+        API-->>前端: top_ads, frequency_level
     end
 ```
 
@@ -337,34 +304,23 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant 用户 as 前端(用户)
+    participant 用户 as 前端
     participant API as API层
-    participant JWT as JWT验证
     participant DB as 数据库
-    participant AS as ActivityScorer
+    participant Scorer as ActivityScorer
     participant FC as FrequencyController
 
-    Note over 用户, DB: 阶段一：行为数据采集
-    用户->>API: POST /api/behavior/track(view, product_id)
-    API->>JWT: verify token
-    JWT-->>API: user_id
-    API->>DB: INSERT user_behaviors(user_id, view, product_id, timestamp)
-    DB-->>API: behavior_id
-    API-->>用户: 确认(behavior_id)
+    用户->>API: POST /api/behavior/track(view)
+    API->>DB: INSERT user_behaviors
+    API-->>用户: 记录成功
 
-    Note over 用户, FC: 阶段二：广告请求触发数据消费
     用户->>API: GET /api/ads/fetch
-    API->>DB: query user_behaviors(user_id)
-    DB-->>API: 全部行为记录
-    API->>AS: calculate_activity_score(behaviors)
-    AS-->>API: score
-    API->>AS: classify_activity_level(score)
-    AS-->>API: level
-    API->>DB: query ad_impressions(today_count, last_ts)
-    DB-->>API: today_count, last_ts
-    API->>FC: check(level, today_count, last_ts)
-    FC-->>API: 频控决策(allow/deny, max_ads)
-    API-->>用户: 广告列表(基于活跃度等级的频控结果)
+    API->>DB: query user_behaviors
+    API->>Scorer: calculate_activity_score()
+    Scorer-->>API: score → level
+    API->>FC: check(level, today_count)
+    FC-->>API: 频控决策
+    API-->>用户: 广告列表
 ```
 
 ---
