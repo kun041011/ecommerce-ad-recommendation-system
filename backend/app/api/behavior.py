@@ -1,3 +1,9 @@
+"""行为追踪路由模块
+
+提供用户行为数据（浏览、点击、收藏、购买等）采集的REST API接口。
+采集的行为数据用于推荐系统和用户活跃度计算。
+"""
+
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
@@ -12,6 +18,20 @@ router = APIRouter(prefix="/api/behavior", tags=["behavior"])
 
 @router.post("/track", status_code=status.HTTP_201_CREATED)
 def track(data: BehaviorTrack, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """记录用户行为事件
+
+    将用户的浏览、点击、收藏等行为记录到数据库，
+    用于后续推荐算法和活跃度评分。
+
+    Args:
+        data: 行为数据（商品ID、行为类型、上下文信息）
+        db: 数据库会话
+        user: 当前登录用户
+
+    Returns:
+        dict: 行为记录状态确认
+    """
+    # 构建行为记录对象并写入数据库
     behavior = UserBehavior(
         user_id=user.id,
         product_id=data.product_id,
