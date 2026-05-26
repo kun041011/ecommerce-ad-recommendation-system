@@ -63,7 +63,7 @@ graph TB
 
 ---
 
-### 图3-3 推荐流程图
+### 图5-7 推荐流程图
 
 ```mermaid
 flowchart TB
@@ -79,7 +79,7 @@ flowchart TB
 
 ---
 
-### 图3-4 广告频控流程图
+### 图5-8 广告频控流程图
 
 ```mermaid
 flowchart TB
