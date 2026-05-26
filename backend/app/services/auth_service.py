@@ -20,10 +20,10 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 def hash_password(password: str) -> str:
     """对明文密码进行哈希加密
 
-    Args:
+    参数:
         password: 用户输入的明文密码
 
-    Returns:
+    返回:
         str: bcrypt哈希后的密码字符串
     """
     return pwd_context.hash(password)
@@ -32,11 +32,11 @@ def hash_password(password: str) -> str:
 def verify_password(plain: str, hashed: str) -> bool:
     """验证明文密码与哈希密码是否匹配
 
-    Args:
+    参数:
         plain: 用户输入的明文密码
         hashed: 数据库中存储的哈希密码
 
-    Returns:
+    返回:
         bool: 密码匹配返回True，否则False
     """
     return pwd_context.verify(plain, hashed)
@@ -45,10 +45,10 @@ def verify_password(plain: str, hashed: str) -> bool:
 def create_access_token(user_id: int) -> str:
     """生成JWT访问令牌
 
-    Args:
+    参数:
         user_id: 用户ID，作为令牌的主体（sub）
 
-    Returns:
+    返回:
         str: 编码后的JWT令牌字符串
     """
     # 计算令牌过期时间
@@ -61,10 +61,10 @@ def create_access_token(user_id: int) -> str:
 def decode_access_token(token: str) -> Optional[int]:
     """解码JWT访问令牌，提取用户ID
 
-    Args:
+    参数:
         token: JWT令牌字符串
 
-    Returns:
+    返回:
         Optional[int]: 解码成功返回用户ID，失败返回None
     """
     try:
@@ -79,13 +79,13 @@ def register_user(db: Session, username: str, email: str, password: str) -> User
 
     创建用户记录并将密码哈希后存储到数据库。
 
-    Args:
+    参数:
         db: 数据库会话
         username: 用户名
         email: 邮箱地址
         password: 明文密码（将被哈希后存储）
 
-    Returns:
+    返回:
         User: 创建成功的用户对象
     """
     user = User(
@@ -104,12 +104,12 @@ def authenticate_user(db: Session, username: str, password: str) -> Optional[Use
 
     根据用户名查找用户，并验证密码是否正确。
 
-    Args:
+    参数:
         db: 数据库会话
         username: 用户名
         password: 明文密码
 
-    Returns:
+    返回:
         Optional[User]: 验证成功返回用户对象，失败返回None
     """
     # 根据用户名查找用户

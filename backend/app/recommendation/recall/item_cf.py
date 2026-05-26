@@ -23,7 +23,7 @@ class ItemCF:
     def fit(self, interaction_matrix: np.ndarray):
         """训练模型，计算物品相似度矩阵
 
-        Args:
+        参数:
             interaction_matrix: 用户-物品交互矩阵，行为用户，列为物品
         """
         self.interaction_matrix = interaction_matrix
@@ -37,12 +37,12 @@ class ItemCF:
 
         根据用户已交互的物品，利用物品相似度加权求和计算推荐分数。
 
-        Args:
+        参数:
             user_idx: 目标用户索引
             n: 推荐物品数量
             exclude_interacted: 是否排除用户已交互的物品
 
-        Returns:
+        返回:
             List[int]: 推荐物品索引列表
         """
         if self.item_sim_matrix is None:

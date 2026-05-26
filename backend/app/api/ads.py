@@ -21,12 +21,12 @@ router = APIRouter(prefix="/api/ads", tags=["ads"])
 def create(data: AdCreate, db: Session = Depends(get_db), user: User = Depends(require_merchant)):
     """创建广告接口（仅商家可用）
 
-    Args:
+    参数:
         data: 广告信息（标题、内容、预算等）
         db: 数据库会话
         user: 当前商家用户（需商家权限）
 
-    Returns:
+    返回:
         Ad: 创建成功的广告信息
     """
     return create_ad(db, user.id, **data.dict())
@@ -38,11 +38,11 @@ def fetch(db: Session = Depends(get_db), user: User = Depends(get_current_user))
 
     根据用户活跃度和行为数据，个性化推荐广告内容。
 
-    Args:
+    参数:
         db: 数据库会话
         user: 当前登录用户
 
-    Returns:
+    返回:
         AdFetchResponse: 推荐的广告列表
     """
     return fetch_ads_for_user(db, user)
@@ -52,12 +52,12 @@ def fetch(db: Session = Depends(get_db), user: User = Depends(get_current_user))
 def impression(data: ImpressionCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """记录广告曝光或点击事件
 
-    Args:
+    参数:
         data: 曝光数据（广告ID、曝光类型、上下文）
         db: 数据库会话
         user: 当前登录用户
 
-    Returns:
+    返回:
         dict: 记录状态确认
     """
     # 记录广告曝光/点击到数据库
@@ -69,11 +69,11 @@ def impression(data: ImpressionCreate, db: Session = Depends(get_db), user: User
 def my_ads(db: Session = Depends(get_db), user: User = Depends(require_merchant)):
     """获取当前商家创建的广告列表
 
-    Args:
+    参数:
         db: 数据库会话
         user: 当前商家用户（需商家权限）
 
-    Returns:
+    返回:
         list[Ad]: 当前商家的所有广告
     """
     return get_merchant_ads(db, user.id)
@@ -83,12 +83,12 @@ def my_ads(db: Session = Depends(get_db), user: User = Depends(require_merchant)
 def stats(ad_id: int, db: Session = Depends(get_db), _user: User = Depends(require_merchant)):
     """获取指定广告的统计数据（仅商家可用）
 
-    Args:
+    参数:
         ad_id: 广告ID
         db: 数据库会话
         _user: 当前商家用户（用于权限校验）
 
-    Returns:
+    返回:
         AdStatsResponse: 广告的展示量、点击量、点击率等统计
     """
     return get_ad_stats(db, ad_id)

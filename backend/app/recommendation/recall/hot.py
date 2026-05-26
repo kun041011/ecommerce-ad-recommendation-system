@@ -20,7 +20,7 @@ class HotRecall:
     def update(self, scores: Dict[int, float]):
         """更新商品热度分数
 
-        Args:
+        参数:
             scores: 商品ID到热度分数的映射字典
         """
         self.product_scores = scores
@@ -30,11 +30,11 @@ class HotRecall:
 
         按热度分数降序排列，排除指定的商品ID。
 
-        Args:
+        参数:
             n: 推荐数量
             exclude_ids: 需要排除的商品ID集合
 
-        Returns:
+        返回:
             List[int]: 热门商品ID列表
         """
         exclude = exclude_ids or set()

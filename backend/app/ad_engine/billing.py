@@ -11,11 +11,11 @@ def calculate_cpc_charge(current_pctr: float, next_ecpm: float) -> float:
     采用GSP（广义第二价格）拍卖机制，扣费 = 下一位eCPM / 当前预估点击率 / 1000 + 0.01。
     保证广告主只需支付略高于下一名的费用。
 
-    Args:
+    参数:
         current_pctr: 当前广告的预估点击率
         next_ecpm: 下一位广告的eCPM
 
-    Returns:
+    返回:
         float: 点击扣费金额，最低0.01元
     """
     # 预估点击率为0时，收取最低费用
@@ -31,10 +31,10 @@ def calculate_cpm_charge(bid_amount: float) -> float:
 
     CPM为千次展示费用，单次展示扣费 = 出价 / 1000。
 
-    Args:
+    参数:
         bid_amount: CPM出价金额（每千次展示价格）
 
-    Returns:
+    返回:
         float: 单次展示扣费金额
     """
     return round(bid_amount / 1000, 4)

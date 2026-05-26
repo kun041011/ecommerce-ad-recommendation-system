@@ -25,14 +25,14 @@ def get_current_user(
     从请求头中提取Bearer Token，解码JWT获取用户ID，
     然后从数据库查询对应用户。
 
-    Args:
+    参数:
         credentials: HTTP Bearer认证凭证（包含JWT令牌）
         db: 数据库会话
 
-    Returns:
+    返回:
         User: 当前登录的用户对象
 
-    Raises:
+    异常:
         HTTPException: 令牌无效（401）或用户不存在（401）
     """
     # 解码JWT令牌获取用户ID
@@ -51,13 +51,13 @@ def require_merchant(user: User = Depends(get_current_user)) -> User:
 
     要求当前用户角色为商家或管理员，否则拒绝访问。
 
-    Args:
+    参数:
         user: 当前登录用户（通过get_current_user获取）
 
-    Returns:
+    返回:
         User: 具有商家权限的用户对象
 
-    Raises:
+    异常:
         HTTPException: 无商家权限（403）
     """
     if user.role not in (UserRole.merchant, UserRole.admin):
@@ -70,13 +70,13 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
 
     要求当前用户角色为管理员，否则拒绝访问。
 
-    Args:
+    参数:
         user: 当前登录用户（通过get_current_user获取）
 
-    Returns:
+    返回:
         User: 具有管理员权限的用户对象
 
-    Raises:
+    异常:
         HTTPException: 无管理员权限（403）
     """
     if user.role != UserRole.admin:

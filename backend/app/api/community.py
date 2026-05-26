@@ -24,12 +24,12 @@ router = APIRouter(tags=["community"])
 def post_review(data: ReviewCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """发布商品评价
 
-    Args:
+    参数:
         data: 评价信息（商品ID、评分、评价内容）
         db: 数据库会话
         user: 当前登录用户
 
-    Returns:
+    返回:
         Review: 创建成功的评价信息
     """
     return create_review(db, user.id, data.product_id, data.rating, data.content)
@@ -39,11 +39,11 @@ def post_review(data: ReviewCreate, db: Session = Depends(get_db), user: User = 
 def list_reviews(product_id: int, db: Session = Depends(get_db)):
     """获取指定商品的评价列表
 
-    Args:
+    参数:
         product_id: 商品ID
         db: 数据库会话
 
-    Returns:
+    返回:
         list[Review]: 该商品的所有评价，按时间倒序
     """
     return get_product_reviews(db, product_id)
@@ -53,12 +53,12 @@ def list_reviews(product_id: int, db: Session = Depends(get_db)):
 def helpful(review_id: int, db: Session = Depends(get_db), _user: User = Depends(get_current_user)):
     """标记评价为有用（点赞）
 
-    Args:
+    参数:
         review_id: 评价ID
         db: 数据库会话
         _user: 当前登录用户（用于登录校验）
 
-    Returns:
+    返回:
         Review: 更新后的评价信息（helpful_count加1）
     """
     review = mark_helpful(db, review_id)
@@ -71,12 +71,12 @@ def helpful(review_id: int, db: Session = Depends(get_db), _user: User = Depends
 def post_question(data: QACreate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """发布商品提问
 
-    Args:
+    参数:
         data: 提问信息（商品ID、问题内容）
         db: 数据库会话
         user: 当前登录用户
 
-    Returns:
+    返回:
         QA: 创建成功的问答记录
     """
     return create_question(db, user.id, data.product_id, data.question)
@@ -86,11 +86,11 @@ def post_question(data: QACreate, db: Session = Depends(get_db), user: User = De
 def list_qa(product_id: int, db: Session = Depends(get_db)):
     """获取指定商品的问答列表
 
-    Args:
+    参数:
         product_id: 商品ID
         db: 数据库会话
 
-    Returns:
+    返回:
         list[QA]: 该商品的所有问答，按时间倒序
     """
     return get_product_qa(db, product_id)
@@ -100,13 +100,13 @@ def list_qa(product_id: int, db: Session = Depends(get_db)):
 def post_answer(qa_id: int, data: QAAnswerCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """回答商品问题
 
-    Args:
+    参数:
         qa_id: 问答记录ID
         data: 回答内容
         db: 数据库会话
         user: 当前登录用户（回答者）
 
-    Returns:
+    返回:
         QA: 更新后的问答记录（包含回答内容）
     """
     qa = answer_question(db, qa_id, user.id, data.answer)

@@ -22,11 +22,11 @@ def home(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
 
     按销量降序返回热门商品，作为首页默认推荐内容。
 
-    Args:
+    参数:
         db: 数据库会话
         user: 当前登录用户
 
-    Returns:
+    返回:
         list[Product]: 按销量排序的前20个商品
     """
     # 按销量降序排列，取前20个热门商品
@@ -40,12 +40,12 @@ def similar(product_id: int, db: Session = Depends(get_db), _user: User = Depend
 
     根据目标商品的分类，推荐同分类下的其他商品。
 
-    Args:
+    参数:
         product_id: 目标商品ID
         db: 数据库会话
         _user: 当前登录用户（用于登录校验）
 
-    Returns:
+    返回:
         list[Product]: 同分类下的相似商品列表（最多10个）
     """
     # 查找目标商品
@@ -67,11 +67,11 @@ def for_you(db: Session = Depends(get_db), user: User = Depends(get_current_user
     当前实现为按创建时间倒序返回最新商品，
     后续可接入协同过滤等个性化推荐算法。
 
-    Args:
+    参数:
         db: 数据库会话
         user: 当前登录用户
 
-    Returns:
+    返回:
         list[Product]: 按时间倒序的最新20个商品
     """
     # 按创建时间倒序，取最新的20个商品

@@ -35,10 +35,10 @@ POLICIES = {
 def get_policy(activity_level: str) -> FrequencyPolicy:
     """根据活跃等级获取对应的频控策略
 
-    Args:
+    参数:
         activity_level: 用户活跃等级（high/normal/low）
 
-    Returns:
+    返回:
         FrequencyPolicy: 对应的频控策略，未匹配时返回普通等级策略
     """
     return POLICIES.get(activity_level, POLICIES["normal"])
@@ -57,13 +57,13 @@ class FrequencyController:
 
         依次检查每日上限和最小时间间隔两个条件。
 
-        Args:
+        参数:
             user_id: 用户ID
             activity_level: 用户活跃等级
             today_count: 今日已展示次数
             last_shown_ts: 上次展示的时间戳
 
-        Returns:
+        返回:
             dict: 包含 allowed（是否允许）、reason（原因）、max_ads（可展示数量）
         """
         policy = get_policy(activity_level)

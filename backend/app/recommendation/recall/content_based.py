@@ -24,7 +24,7 @@ class ContentBasedRecall:
     def fit(self, product_texts: List[str]):
         """训练模型，构建商品内容相似度矩阵
 
-        Args:
+        参数:
             product_texts: 商品文本描述列表（标题、描述等拼接文本）
         """
         try:
@@ -44,12 +44,12 @@ class ContentBasedRecall:
 
         对用户喜欢的商品集合，取平均相似度作为推荐分数。
 
-        Args:
+        参数:
             liked_indices: 用户喜好的商品索引列表
             n: 推荐数量
             exclude_indices: 需要排除的商品索引列表
 
-        Returns:
+        返回:
             List[int]: 推荐商品索引列表
         """
         if self.sim_matrix is None or not liked_indices:

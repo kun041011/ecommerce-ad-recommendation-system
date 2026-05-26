@@ -21,12 +21,12 @@ router = APIRouter(prefix="/api/orders", tags=["orders"])
 def create(data: OrderCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """创建订单接口
 
-    Args:
+    参数:
         data: 订单数据，包含商品列表及数量
         db: 数据库会话
         user: 当前登录用户
 
-    Returns:
+    返回:
         Order: 创建成功的订单信息
     """
     # 将订单项Schema转换为字典列表
@@ -38,11 +38,11 @@ def create(data: OrderCreate, db: Session = Depends(get_db), user: User = Depend
 def list_mine(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """获取当前用户的订单列表
 
-    Args:
+    参数:
         db: 数据库会话
         user: 当前登录用户
 
-    Returns:
+    返回:
         list[Order]: 当前用户的所有订单，按时间倒序
     """
     return get_user_orders(db, user.id)
@@ -52,12 +52,12 @@ def list_mine(db: Session = Depends(get_db), user: User = Depends(get_current_us
 def get_by_id(order_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """根据ID获取订单详情（仅限本人订单）
 
-    Args:
+    参数:
         order_id: 订单ID
         db: 数据库会话
         user: 当前登录用户
 
-    Returns:
+    返回:
         Order: 订单详细信息
     """
     order = get_order(db, order_id)

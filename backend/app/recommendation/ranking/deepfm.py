@@ -31,10 +31,10 @@ if HAS_TORCH:
 
             利用公式：0.5 * (sum(vi)^2 - sum(vi^2))
 
-            Args:
+            参数:
                 embeddings: 特征嵌入张量，形状(batch, fields, dim)
 
-            Returns:
+            返回:
                 Tensor: FM交叉项输出，形状(batch, 1)
             """
             # 先求和再平方
@@ -52,7 +52,7 @@ if HAS_TORCH:
         def __init__(self, sparse_field_dims: List[int], embed_dim: int, dense_dim: int, hidden_dims: List[int]):
             """初始化DeepFM模型
 
-            Args:
+            参数:
                 sparse_field_dims: 各离散特征的取值数量列表
                 embed_dim: 嵌入向量维度
                 dense_dim: 连续特征维度
@@ -80,11 +80,11 @@ if HAS_TORCH:
         def forward(self, sparse_input, dense_input):
             """前向传播
 
-            Args:
+            参数:
                 sparse_input: 离散特征索引，形状(batch, num_fields)
                 dense_input: 连续特征值，形状(batch, dense_dim)
 
-            Returns:
+            返回:
                 Tensor: 预测点击率，形状(batch, 1)
             """
             # 离散特征嵌入查表
@@ -112,7 +112,7 @@ else:
         def __init__(self, sparse_field_dims: List[int], embed_dim: int, dense_dim: int, hidden_dims: List[int]):
             """初始化DeepFM模型
 
-            Args:
+            参数:
                 sparse_field_dims: 各离散特征的取值数量列表
                 embed_dim: 嵌入向量维度
                 dense_dim: 连续特征维度
@@ -137,11 +137,11 @@ else:
         def predict(self, sparse_input: np.ndarray, dense_input: np.ndarray) -> np.ndarray:
             """预测点击率
 
-            Args:
+            参数:
                 sparse_input: 离散特征索引，形状(batch, num_fields)
                 dense_input: 连续特征值，形状(batch, dense_dim)
 
-            Returns:
+            返回:
                 ndarray: 预测点击率，形状(batch, 1)
             """
             batch = sparse_input.shape[0]
@@ -164,4 +164,4 @@ else:
 
             # FM与DNN输出相加，经Sigmoid输出预测概率
             logit = fm_out + x
-            return 1.0 / (1.0 + np.exp(-logit))  # sigmoid
+            return 1.0 / (1.0 + np.exp(-logit))  # Sigmoid激活函数

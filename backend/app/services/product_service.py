@@ -15,12 +15,12 @@ from app.models.product import Product
 def create_product(db: Session, merchant_id: int, **kwargs) -> Product:
     """创建商品
 
-    Args:
+    参数:
         db: 数据库会话
         merchant_id: 商家用户ID
         **kwargs: 商品属性（name、price、stock等）
 
-    Returns:
+    返回:
         Product: 创建成功的商品对象
     """
     product = Product(merchant_id=merchant_id, **kwargs)
@@ -33,11 +33,11 @@ def create_product(db: Session, merchant_id: int, **kwargs) -> Product:
 def get_product(db: Session, product_id: int) -> Optional[Product]:
     """根据ID查询单个商品
 
-    Args:
+    参数:
         db: 数据库会话
         product_id: 商品ID
 
-    Returns:
+    返回:
         Optional[Product]: 商品对象，不存在则返回None
     """
     return db.query(Product).filter(Product.id == product_id).first()
@@ -46,12 +46,12 @@ def get_product(db: Session, product_id: int) -> Optional[Product]:
 def list_products(db: Session, page: int = 1, page_size: int = 20) -> dict:
     """分页获取商品列表
 
-    Args:
+    参数:
         db: 数据库会话
         page: 页码，从1开始
         page_size: 每页数量
 
-    Returns:
+    返回:
         dict: 包含items（商品列表）、total（总数）、page、page_size的分页数据
     """
     query = db.query(Product)
@@ -70,7 +70,7 @@ def search_products(
 
     支持关键词模糊搜索（名称或描述）、分类过滤和价格区间过滤。
 
-    Args:
+    参数:
         db: 数据库会话
         query: 搜索关键词（模糊匹配名称和描述）
         category_id: 分类ID过滤
@@ -79,7 +79,7 @@ def search_products(
         page: 页码
         page_size: 每页数量
 
-    Returns:
+    返回:
         dict: 符合条件的分页商品数据
     """
     q = db.query(Product)
@@ -105,12 +105,12 @@ def update_product(db: Session, product: Product, **kwargs) -> Product:
 
     仅更新传入的非None字段。
 
-    Args:
+    参数:
         db: 数据库会话
         product: 待更新的商品对象
         **kwargs: 需要更新的字段及其新值
 
-    Returns:
+    返回:
         Product: 更新后的商品对象
     """
     # 遍历参数，仅更新非None的字段

@@ -19,15 +19,15 @@ def create_order(db: Session, user_id: int, items: list) -> Order:
     校验每个商品的存在性和库存充足性，计算订单总金额，
     创建订单和订单项，并扣减对应商品库存、更新销量。
 
-    Args:
+    参数:
         db: 数据库会话
         user_id: 下单用户ID
         items: 订单项列表，每项包含product_id和quantity
 
-    Returns:
+    返回:
         Order: 创建成功的订单对象
 
-    Raises:
+    异常:
         HTTPException: 商品不存在（400）或库存不足（400）
     """
     total = 0.0
@@ -62,11 +62,11 @@ def create_order(db: Session, user_id: int, items: list) -> Order:
 def get_user_orders(db: Session, user_id: int) -> list:
     """获取指定用户的所有订单
 
-    Args:
+    参数:
         db: 数据库会话
         user_id: 用户ID
 
-    Returns:
+    返回:
         list[Order]: 该用户的所有订单，按创建时间倒序排列
     """
     return db.query(Order).filter(Order.user_id == user_id).order_by(Order.created_at.desc()).all()
@@ -75,11 +75,11 @@ def get_user_orders(db: Session, user_id: int) -> list:
 def get_order(db: Session, order_id: int) -> Optional[Order]:
     """根据ID查询单个订单
 
-    Args:
+    参数:
         db: 数据库会话
         order_id: 订单ID
 
-    Returns:
+    返回:
         Optional[Order]: 订单对象，不存在则返回None
     """
     return db.query(Order).filter(Order.id == order_id).first()

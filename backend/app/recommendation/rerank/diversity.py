@@ -13,12 +13,12 @@ def mmr_rerank(items: List[dict], n: int = 10, lambda_param: float = 0.5) -> Lis
     MMR公式：score = lambda * relevance - (1-lambda) * max_similarity
     lambda越大越偏重相关性，越小越偏重多样性。
 
-    Args:
+    参数:
         items: 候选物品列表，每个物品需包含 score 和 category 字段
         n: 重排后返回的物品数量
         lambda_param: 相关性与多样性的权衡参数（0-1），默认0.5
 
-    Returns:
+    返回:
         List[dict]: 重排后的物品列表
     """
     if not items:

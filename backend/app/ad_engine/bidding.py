@@ -12,10 +12,10 @@ def compute_ecpm(ad: dict) -> float:
 
     CPM广告直接使用出价金额；CPC广告通过 出价*预估点击率*1000 换算。
 
-    Args:
+    参数:
         ad: 广告字典，包含 bid_type、bid_amount、pctr 等字段
 
-    Returns:
+    返回:
         float: 等效eCPM值
     """
     if ad["bid_type"] == "CPM":
@@ -30,10 +30,10 @@ def rank_ads_by_ecpm(ads: List[dict]) -> List[dict]:
 
     为每个广告计算eCPM并写入字典，然后按eCPM从高到低排序。
 
-    Args:
+    参数:
         ads: 广告字典列表
 
-    Returns:
+    返回:
         List[dict]: 按eCPM降序排列的广告列表
     """
     # 为每个广告计算并存储eCPM值

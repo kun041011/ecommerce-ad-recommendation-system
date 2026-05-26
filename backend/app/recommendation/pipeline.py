@@ -35,7 +35,7 @@ class RecommendationPipeline:
     def fit(self, interaction_matrix: np.ndarray, product_texts: List[str], product_views: dict):
         """训练所有召回模型
 
-        Args:
+        参数:
             interaction_matrix: 用户-物品交互矩阵
             product_texts: 商品文本描述列表
             product_views: 商品热度分数字典
@@ -57,13 +57,13 @@ class RecommendationPipeline:
 
         流程：多路召回 -> 业务规则过滤 -> MMR多样性重排 -> 热门补充。
 
-        Args:
+        参数:
             user_idx: 用户索引（None表示冷启动用户）
             n: 推荐数量
             product_ids: 全部商品ID列表
             purchased_ids: 用户已购买的商品ID集合
 
-        Returns:
+        返回:
             List[int]: 推荐商品ID列表
         """
         product_ids = product_ids or []

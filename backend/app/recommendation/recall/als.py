@@ -19,7 +19,7 @@ class ALSRecall:
     def __init__(self, n_components: int = 10):
         """初始化ALS推荐器
 
-        Args:
+        参数:
             n_components: 隐因子维度数，控制模型的表达能力
         """
         self.n_components = n_components
@@ -32,7 +32,7 @@ class ALSRecall:
 
         使用NMF将交互矩阵分解为 用户因子(U) × 物品因子(V^T)。
 
-        Args:
+        参数:
             interaction_matrix: 用户-物品交互矩阵
         """
         self.interaction_matrix = interaction_matrix
@@ -48,12 +48,12 @@ class ALSRecall:
 
         通过用户因子与物品因子的内积计算偏好分数。
 
-        Args:
+        参数:
             user_idx: 目标用户索引
             n: 推荐物品数量
             exclude_interacted: 是否排除用户已交互的物品
 
-        Returns:
+        返回:
             List[int]: 推荐物品索引列表
         """
         if self.user_factors is None:

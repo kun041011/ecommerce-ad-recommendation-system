@@ -19,11 +19,11 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 def register(data: UserCreate, db: Session = Depends(get_db)):
     """用户注册接口
 
-    Args:
+    参数:
         data: 注册信息（用户名、邮箱、密码）
         db: 数据库会话
 
-    Returns:
+    返回:
         User: 注册成功的用户信息
     """
     # 检查用户名或邮箱是否已被注册
@@ -41,11 +41,11 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
 def login(data: UserLogin, db: Session = Depends(get_db)):
     """用户登录接口
 
-    Args:
+    参数:
         data: 登录凭证（用户名、密码）
         db: 数据库会话
 
-    Returns:
+    返回:
         Token: 包含JWT访问令牌的响应
     """
     # 验证用户凭证
@@ -61,10 +61,10 @@ def login(data: UserLogin, db: Session = Depends(get_db)):
 def me(current_user: User = Depends(get_current_user)):
     """获取当前登录用户信息
 
-    Args:
+    参数:
         current_user: 通过JWT令牌解析出的当前用户
 
-    Returns:
+    返回:
         User: 当前用户的详细信息
     """
     return current_user

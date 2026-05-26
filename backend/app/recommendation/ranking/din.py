@@ -35,12 +35,12 @@ if HAS_TORCH:
         def forward(self, queries, keys, mask):
             """计算注意力加权的用户兴趣表示
 
-            Args:
+            参数:
                 queries: 候选物品嵌入，形状(batch, 1, dim)
                 keys: 行为序列嵌入，形状(batch, seq_len, dim)
                 mask: 有效位置掩码，形状(batch, seq_len)
 
-            Returns:
+            返回:
                 Tensor: 注意力加权后的用户兴趣向量，形状(batch, dim)
             """
             # 扩展查询向量与键向量对齐
@@ -64,7 +64,7 @@ if HAS_TORCH:
         def __init__(self, num_products: int, embed_dim: int, hidden_dims: List[int], max_seq_len: int):
             """初始化DIN模型
 
-            Args:
+            参数:
                 num_products: 商品总数
                 embed_dim: 嵌入向量维度
                 hidden_dims: DNN各隐藏层维度列表
@@ -89,12 +89,12 @@ if HAS_TORCH:
         def forward(self, behavior_seq, seq_lengths, candidate):
             """前向传播
 
-            Args:
+            参数:
                 behavior_seq: 用户行为序列，形状(batch, max_seq_len)
                 seq_lengths: 各样本有效序列长度，形状(batch,)
                 candidate: 候选商品ID，形状(batch,)
 
-            Returns:
+            返回:
                 Tensor: 预测点击率，形状(batch, 1)
             """
             # 行为序列和候选商品的嵌入查表
@@ -121,7 +121,7 @@ else:
         def __init__(self, num_products: int, embed_dim: int, hidden_dims: List[int], max_seq_len: int):
             """初始化DIN模型
 
-            Args:
+            参数:
                 num_products: 商品总数
                 embed_dim: 嵌入向量维度
                 hidden_dims: DNN各隐藏层维度列表
@@ -144,12 +144,12 @@ else:
         def predict(self, behavior_seq: np.ndarray, seq_lengths: np.ndarray, candidate: np.ndarray) -> np.ndarray:
             """预测点击率
 
-            Args:
+            参数:
                 behavior_seq: 用户行为序列，形状(batch, max_seq_len)
                 seq_lengths: 各样本有效序列长度，形状(batch,)
                 candidate: 候选商品ID，形状(batch,)
 
-            Returns:
+            返回:
                 ndarray: 预测点击率，形状(batch, 1)
             """
             batch = behavior_seq.shape[0]

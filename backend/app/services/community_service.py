@@ -14,14 +14,14 @@ from app.models.community import QA, Review
 def create_review(db: Session, user_id: int, product_id: int, rating: int, content: str) -> Review:
     """创建商品评价
 
-    Args:
+    参数:
         db: 数据库会话
         user_id: 评价用户ID
         product_id: 商品ID
         rating: 评分（如1-5分）
         content: 评价内容
 
-    Returns:
+    返回:
         Review: 创建成功的评价对象
     """
     review = Review(user_id=user_id, product_id=product_id, rating=rating, content=content)
@@ -34,11 +34,11 @@ def create_review(db: Session, user_id: int, product_id: int, rating: int, conte
 def get_product_reviews(db: Session, product_id: int) -> list:
     """获取指定商品的所有评价
 
-    Args:
+    参数:
         db: 数据库会话
         product_id: 商品ID
 
-    Returns:
+    返回:
         list[Review]: 该商品的所有评价，按创建时间倒序排列
     """
     return db.query(Review).filter(Review.product_id == product_id).order_by(Review.created_at.desc()).all()
@@ -47,11 +47,11 @@ def get_product_reviews(db: Session, product_id: int) -> list:
 def mark_helpful(db: Session, review_id: int) -> Optional[Review]:
     """标记评价为有用（helpful_count加1）
 
-    Args:
+    参数:
         db: 数据库会话
         review_id: 评价ID
 
-    Returns:
+    返回:
         Optional[Review]: 更新后的评价对象，评价不存在则返回None
     """
     review = db.query(Review).filter(Review.id == review_id).first()
@@ -67,13 +67,13 @@ def mark_helpful(db: Session, review_id: int) -> Optional[Review]:
 def create_question(db: Session, user_id: int, product_id: int, question: str) -> QA:
     """创建商品问题
 
-    Args:
+    参数:
         db: 数据库会话
         user_id: 提问用户ID
         product_id: 商品ID
         question: 问题内容
 
-    Returns:
+    返回:
         QA: 创建成功的问答记录
     """
     qa = QA(user_id=user_id, product_id=product_id, question=question)
@@ -86,13 +86,13 @@ def create_question(db: Session, user_id: int, product_id: int, question: str) -
 def answer_question(db: Session, qa_id: int, user_id: int, answer: str) -> Optional[QA]:
     """回答商品问题
 
-    Args:
+    参数:
         db: 数据库会话
         qa_id: 问答记录ID
         user_id: 回答用户ID
         answer: 回答内容
 
-    Returns:
+    返回:
         Optional[QA]: 更新后的问答记录，问题不存在则返回None
     """
     qa = db.query(QA).filter(QA.id == qa_id).first()
@@ -109,11 +109,11 @@ def answer_question(db: Session, qa_id: int, user_id: int, answer: str) -> Optio
 def get_product_qa(db: Session, product_id: int) -> list:
     """获取指定商品的所有问答
 
-    Args:
+    参数:
         db: 数据库会话
         product_id: 商品ID
 
-    Returns:
+    返回:
         list[QA]: 该商品的所有问答，按创建时间倒序排列
     """
     return db.query(QA).filter(QA.product_id == product_id).order_by(QA.created_at.desc()).all()

@@ -24,11 +24,11 @@ def dashboard(db: Session = Depends(get_db), _user: User = Depends(require_admin
     汇总平台核心运营指标，包括用户数、商品数、订单数、
     营收、广告收入、点击率（CTR）和千次展示收入（RPM）。
 
-    Args:
+    参数:
         db: 数据库会话
         _user: 当前管理员用户（用于权限校验）
 
-    Returns:
+    返回:
         dict: 平台核心运营指标汇总
     """
     # 统计用户总数
@@ -62,11 +62,11 @@ def activity_dist(db: Session = Depends(get_db), _user: User = Depends(require_a
 
     将用户按活跃度评分分为低活跃（<20）、正常（20-60）、高活跃（>=60）三档。
 
-    Args:
+    参数:
         db: 数据库会话
         _user: 当前管理员用户（用于权限校验）
 
-    Returns:
+    返回:
         dict: 各活跃等级的用户数量（low、normal、high）
     """
     # 低活跃用户：评分 < 20
@@ -84,11 +84,11 @@ def ad_performance(db: Session = Depends(get_db), _user: User = Depends(require_
 
     统计每个广告的展示次数、点击次数、点击率和花费金额。
 
-    Args:
+    参数:
         db: 数据库会话
         _user: 当前管理员用户（用于权限校验）
 
-    Returns:
+    返回:
         list[dict]: 每个广告的效果统计数据
     """
     # 查询所有广告

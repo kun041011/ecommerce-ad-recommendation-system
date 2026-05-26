@@ -17,7 +17,7 @@ class FeatureEncoder:
     def __init__(self, sparse_dims: Dict[str, int], dense_count: int):
         """初始化特征编码器
 
-        Args:
+        参数:
             sparse_dims: 各离散特征域的取值数量，如 {"category": 50, "brand": 200}
             dense_count: 连续特征的数量
         """
@@ -30,11 +30,11 @@ class FeatureEncoder:
 
         将离散特征按域顺序提取索引，连续特征直接传递。
 
-        Args:
+        参数:
             sparse: 离散特征字典，如 {"category": 3, "brand": 15}
             dense: 连续特征值列表，如 [29.9, 4.5]
 
-        Returns:
+        返回:
             dict: 包含 sparse_indices（离散索引列表）和 dense_values（连续值列表）
         """
         # 按字段顺序提取离散特征索引

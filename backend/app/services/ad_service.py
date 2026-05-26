@@ -23,12 +23,12 @@ freq_controller = FrequencyController()
 def create_ad(db: Session, advertiser_id: int, **kwargs) -> Ad:
     """创建新广告
 
-    Args:
+    参数:
         db: 数据库会话
         advertiser_id: 广告主ID
         **kwargs: 广告属性（标题、预算、出价等）
 
-    Returns:
+    返回:
         Ad: 创建完成的广告对象
     """
     ad = Ad(advertiser_id=advertiser_id, **kwargs)
@@ -43,11 +43,11 @@ def fetch_ads_for_user(db: Session, user: User) -> dict:
 
     完整流程：计算活跃度 -> 频控检查 -> 竞价排序 -> 返回结果。
 
-    Args:
+    参数:
         db: 数据库会话
         user: 当前用户对象
 
-    Returns:
+    返回:
         dict: 包含 ads（广告列表）、frequency_level（频控等级）、remaining_today（今日剩余量）
     """
     # 获取用户行为记录，计算活跃度评分和等级
@@ -93,7 +93,7 @@ def record_impression(db: Session, user_id: int, ad_id: int, impression_type: st
     创建展示记录；若为CPC广告的点击事件，执行计费扣款，
     并在预算耗尽时将广告状态标记为已耗尽。
 
-    Args:
+    参数:
         db: 数据库会话
         user_id: 用户ID
         ad_id: 广告ID
@@ -124,11 +124,11 @@ def record_impression(db: Session, user_id: int, ad_id: int, impression_type: st
 def get_merchant_ads(db: Session, advertiser_id: int) -> list:
     """获取商家的所有广告列表
 
-    Args:
+    参数:
         db: 数据库会话
         advertiser_id: 广告主ID
 
-    Returns:
+    返回:
         list: 该广告主的所有广告对象列表
     """
     return db.query(Ad).filter(Ad.advertiser_id == advertiser_id).all()
@@ -139,11 +139,11 @@ def get_ad_stats(db: Session, ad_id: int) -> dict:
 
     统计展示数、点击数、转化数，计算点击率和已消耗金额。
 
-    Args:
+    参数:
         db: 数据库会话
         ad_id: 广告ID
 
-    Returns:
+    返回:
         dict: 包含展示/点击/转化数、点击率、已花费金额
     """
     # 分别统计展示、点击、转化次数

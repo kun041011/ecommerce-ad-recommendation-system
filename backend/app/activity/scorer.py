@@ -29,10 +29,10 @@ def time_decay(days_ago: float) -> float:
 
     使用指数衰减函数 e^(-λ*t)，距今天数越远衰减越大。
 
-    Args:
+    参数:
         days_ago: 距今天数
 
-    Returns:
+    返回:
         float: 衰减因子，范围(0, 1]
     """
     return math.exp(-DECAY_LAMBDA * days_ago)
@@ -44,10 +44,10 @@ def calculate_activity_score(behaviors: List[Dict]) -> float:
     遍历用户行为记录，根据行为类型权重和时间衰减因子加权求和，
     最终评分限制在0-100之间。
 
-    Args:
+    参数:
         behaviors: 用户行为记录列表，每条记录包含 behavior_type 和 created_at
 
-    Returns:
+    返回:
         float: 活跃度评分（0-100）
     """
     now = datetime.now(timezone.utc)
@@ -72,10 +72,10 @@ def classify_activity_level(score: float) -> str:
     将用户分为高活跃、普通和低活跃三个等级，
     用于后续广告频控策略的差异化处理。
 
-    Args:
+    参数:
         score: 活跃度评分
 
-    Returns:
+    返回:
         str: 活跃等级（high/normal/low）
     """
     if score >= 60:

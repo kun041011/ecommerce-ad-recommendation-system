@@ -24,11 +24,11 @@ def my_score(db: Session = Depends(get_db), user: User = Depends(get_current_use
     从数据库查询用户所有行为记录，计算活跃度评分并分类等级。
     评分结果同时用于决定广告投放频率。
 
-    Args:
+    参数:
         db: 数据库会话
         user: 当前登录用户
 
-    Returns:
+    返回:
         ActivityScoreResponse: 包含评分、活跃等级和广告频率等级
     """
     # 查询用户所有行为记录

@@ -23,12 +23,12 @@ def track(data: BehaviorTrack, db: Session = Depends(get_db), user: User = Depen
     将用户的浏览、点击、收藏等行为记录到数据库，
     用于后续推荐算法和活跃度评分。
 
-    Args:
+    参数:
         data: 行为数据（商品ID、行为类型、上下文信息）
         db: 数据库会话
         user: 当前登录用户
 
-    Returns:
+    返回:
         dict: 行为记录状态确认
     """
     # 构建行为记录对象并写入数据库

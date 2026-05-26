@@ -16,12 +16,12 @@ def apply_business_rules(
 
     过滤掉用户已购买和已展示的商品，避免重复推荐。
 
-    Args:
+    参数:
         items: 推荐候选物品列表，每个物品需包含 id 字段
         purchased_ids: 用户已购买的商品ID集合
         shown_ids: 用户已展示过的商品ID集合
 
-    Returns:
+    返回:
         List[dict]: 过滤后的物品列表
     """
     # 排除已购买和已展示的商品
