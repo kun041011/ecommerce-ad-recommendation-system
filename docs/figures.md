@@ -277,14 +277,17 @@ classDiagram
         +get_ad_stats(ad_id) dict
     }
     class ActivityScorer {
+        <<module>>
         -dict BEHAVIOR_WEIGHTS
-        -float DECAY_RATE
+        -float DECAY_LAMBDA = 0.1
         +time_decay(days_ago) float
         +calculate_activity_score(behaviors) float
         +classify_activity_level(score) str
     }
     class FrequencyController {
+        -dict POLICIES
         +check(user_id, level, today_count, last_ts) dict
+        -get_policy(activity_level) FrequencyPolicy
     }
     class FrequencyPolicy {
         <<dataclass>>
@@ -293,10 +296,13 @@ classDiagram
         +int daily_cap
     }
     class Bidding {
-        +compute_ecpm(ad, pctr) float
+        <<module>>
+        +compute_ecpm(ad) float
         +rank_ads_by_ecpm(ads) list
     }
     class Billing {
+        <<module>>
+        -float MIN_CHARGE = 0.01
         +calculate_cpc_charge(pctr, next_ecpm) float
         +calculate_cpm_charge(bid) float
     }
