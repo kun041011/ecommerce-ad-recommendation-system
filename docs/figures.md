@@ -168,42 +168,65 @@ flowchart TB
 ```mermaid
 classDiagram
     class RecommendationPipeline {
+        -UserCF user_cf
+        -ItemCF item_cf
+        -ContentBasedRecall content_based
+        -HotRecall hot
+        -bool _fitted
+        +fit(interaction_matrix, product_texts, product_views)
         +run(user_id, limit) list
     }
     class UserCF {
+        -ndarray user_sim_matrix
+        -ndarray interaction_matrix
         +fit(interaction_matrix)
-        +recommend(user_id, top_k) list
+        +recommend(user_idx, n) List~int~
     }
     class ItemCF {
+        -ndarray item_sim_matrix
+        -ndarray interaction_matrix
         +fit(interaction_matrix)
-        +recommend(user_id, top_k) list
+        +recommend(user_idx, n) List~int~
     }
-    class ContentBased {
-        +fit(product_features)
-        +recommend(user_id, top_k) list
+    class ContentBasedRecall {
+        -ndarray tfidf_matrix
+        -ndarray sim_matrix
+        +fit(product_texts)
+        +recommend(liked_indices, n) List~int~
     }
     class ALSModel {
-        +fit(interaction_matrix)
-        +recommend(user_id, top_k) list
+        -ndarray user_factors
+        -ndarray item_factors
+        -ndarray interaction_matrix
+        +fit(interaction_matrix, n_components)
+        +recommend(user_idx, n) List~int~
     }
     class HotRecall {
-        +recommend(top_k) list
+        -dict product_scores
+        +fit(products)
+        +recommend(n) List~int~
     }
     class DeepFMModel {
-        +forward(x) tensor
-        +predict(candidates) scores
+        -Embedding embeddings
+        -FMLayer fm
+        -Sequential dnn
+        +forward(sparse_x, dense_x) Tensor
+        +predict(candidates) ndarray
     }
     class DINModel {
-        +forward(x) tensor
-        +predict(candidates) scores
+        -Embedding item_embedding
+        -AttentionLayer attention
+        -Sequential dnn
+        +forward(candidate_id, history_ids, mask) Tensor
+        +predict(candidates) ndarray
     }
     class mmr_rerank {
         <<function>>
-        +mmr_rerank(items, lambda_param) list
+        +mmr_rerank(items, n, lambda_param) list
     }
     RecommendationPipeline --> UserCF : 召回
     RecommendationPipeline --> ItemCF : 召回
-    RecommendationPipeline --> ContentBased : 召回
+    RecommendationPipeline --> ContentBasedRecall : 召回
     RecommendationPipeline --> ALSModel : 召回
     RecommendationPipeline --> HotRecall : 召回
     RecommendationPipeline --> DeepFMModel : 排序
@@ -242,9 +265,17 @@ sequenceDiagram
 ```mermaid
 classDiagram
     class AdService {
+        -Session db
+        +create_ad(ad_data, merchant_id) Ad
         +fetch_ads_for_user(user_id) dict
+        +record_impression(ad_id, user_id, type) void
+        +get_merchant_ads(merchant_id) list
+        +get_ad_stats(ad_id) dict
     }
     class ActivityScorer {
+        -dict BEHAVIOR_WEIGHTS
+        -float DECAY_RATE
+        +time_decay(days_ago) float
         +calculate_activity_score(behaviors) float
         +classify_activity_level(score) str
     }
@@ -253,9 +284,9 @@ classDiagram
     }
     class FrequencyPolicy {
         <<dataclass>>
-        +ads_per_page: int
-        +min_interval_sec: int
-        +daily_cap: int
+        +int ads_per_page
+        +int min_interval_sec
+        +int daily_cap
     }
     class Bidding {
         +compute_ecpm(ad, pctr) float
