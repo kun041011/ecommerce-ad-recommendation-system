@@ -366,6 +366,133 @@ sequenceDiagram
 
 ---
 
+### 图4-15 前端架构图
+
+```mermaid
+graph TB
+    subgraph 用户浏览器
+        APP[App.vue<br/>根布局·导航栏·搜索栏·页脚]
+        APP --> ROUTER[Vue Router<br/>10条路由·懒加载]
+    end
+
+    subgraph 页面层 Views
+        ROUTER --> V1[Home.vue<br/>推荐流+广告混排]
+        ROUTER --> V2[ProductDetail.vue<br/>商品详情+评价+问答]
+        ROUTER --> V3[Search.vue<br/>搜索结果]
+        ROUTER --> V4[Cart.vue<br/>购物车]
+        ROUTER --> V5[Orders.vue<br/>订单列表]
+        ROUTER --> V6[Profile.vue<br/>用户中心+活跃度]
+        ROUTER --> V7[MerchantDashboard.vue<br/>商家后台]
+        ROUTER --> V8[AdminDashboard.vue<br/>管理后台+ECharts]
+        ROUTER --> V9[Login.vue / Register.vue<br/>认证页面]
+    end
+
+    subgraph 复用组件层 Components
+        C1[ProductCard.vue<br/>商品卡片]
+        C2[AdBanner.vue<br/>广告卡片·推广标记]
+        C3[ReviewSection.vue<br/>评价区域]
+        C4[QASection.vue<br/>问答区域]
+        C5[ActivityScore.vue<br/>活跃度仪表盘]
+    end
+
+    V1 --> C1
+    V1 --> C2
+    V2 --> C1
+    V2 --> C2
+    V2 --> C3
+    V2 --> C4
+    V3 --> C1
+    V6 --> C5
+
+    subgraph 状态管理层 Pinia
+        S1[useUserStore<br/>user·token·login·logout]
+        S2[useCartStore<br/>items·total·addItem·clear]
+    end
+
+    V9 --> S1
+    V4 --> S2
+    V2 -->|加入购物车| S2
+    APP --> S1
+    APP --> S2
+
+    subgraph API封装层 Axios
+        CLIENT[api/client.ts<br/>baseURL=/api<br/>JWT拦截器]
+        CLIENT --> A1[authApi<br/>register·login·me]
+        CLIENT --> A2[productApi<br/>list·get·search·create]
+        CLIENT --> A3[orderApi<br/>create·list]
+        CLIENT --> A4[recommendApi<br/>home·similar·for-you]
+        CLIENT --> A5[adApi<br/>fetch·impression·create·my·stats]
+        CLIENT --> A6[communityApi<br/>reviews·qa·helpful]
+        CLIENT --> A7[behaviorApi<br/>track]
+        CLIENT --> A8[activityApi<br/>myScore]
+        CLIENT --> A9[analyticsApi<br/>dashboard·dist·performance]
+    end
+
+    S1 --> A1
+    V1 --> A4
+    V1 --> A5
+    V2 --> A2
+    V2 --> A6
+    V2 --> A7
+    V3 --> A2
+    V4 --> A3
+    V5 --> A3
+    V6 --> A8
+    V7 --> A5
+    V8 --> A9
+
+    CLIENT -->|HTTP REST| BACKEND[(FastAPI 后端<br/>9组路由·40+接口)]
+```
+
+---
+
+### 图4-16 前端用户操作流程图
+
+```mermaid
+flowchart TB
+    START([用户访问系统]) --> AUTH{已登录?}
+    AUTH -->|否| LOGIN[Login.vue<br/>输入用户名密码]
+    LOGIN --> STORE_TOKEN[userStore.login<br/>JWT存入localStorage]
+    STORE_TOKEN --> HOME
+    AUTH -->|是| HOME[Home.vue 首页]
+
+    HOME --> SEARCH_ACT{用户操作}
+    SEARCH_ACT -->|搜索| SEARCH[Search.vue<br/>productApi.search]
+    SEARCH_ACT -->|点击商品| DETAIL
+    SEARCH_ACT -->|查看购物车| CART
+
+    HOME -->|加载推荐| REC[recommendApi.home<br/>获取推荐列表]
+    HOME -->|加载广告| AD_FETCH[adApi.fetch<br/>频控过滤后的广告]
+    REC --> DISPLAY[展示推荐流<br/>每3商品穿插1广告]
+    AD_FETCH --> DISPLAY
+    DISPLAY -->|广告进入视野| AD_SHOW[adApi.impression<br/>type=show]
+    DISPLAY -->|点击广告| AD_CLICK[adApi.impression<br/>type=click]
+
+    DISPLAY -->|点击商品卡片| DETAIL[ProductDetail.vue]
+    DETAIL --> TRACK_VIEW[behaviorApi.track<br/>type=view]
+    DETAIL --> LOAD_REVIEW[communityApi.getReviews]
+    DETAIL --> LOAD_QA[communityApi.getQA]
+
+    DETAIL --> DETAIL_ACT{用户操作}
+    DETAIL_ACT -->|加入购物车| ADD_CART[cartStore.addItem<br/>behaviorApi.track type=cart]
+    DETAIL_ACT -->|发表评价| POST_REVIEW[communityApi.postReview<br/>活跃度+5]
+    DETAIL_ACT -->|提问| POST_QA[communityApi.postQuestion]
+    DETAIL_ACT -->|点赞评价| HELPFUL[communityApi.helpful<br/>活跃度+2]
+
+    ADD_CART --> CART[Cart.vue<br/>cartStore.items]
+    CART --> CHECKOUT[点击结算<br/>orderApi.create]
+    CHECKOUT --> CLEAR[cartStore.clear]
+    CLEAR --> ORDERS[Orders.vue<br/>orderApi.list]
+
+    HOME -->|个人中心| PROFILE[Profile.vue]
+    PROFILE --> ACTIVITY[ActivityScore.vue<br/>activityApi.myScore<br/>显示活跃度评分和等级]
+
+    HOME -->|商家后台| MERCHANT[MerchantDashboard.vue<br/>广告管理·创建广告]
+    HOME -->|管理后台| ADMIN[AdminDashboard.vue<br/>ECharts可视化<br/>活跃度饼图·广告效果图]
+```
+
+---
+
 ## 截图（运行系统后截取）
 
 以下图片需要启动前后端系统，在浏览器中截取：
