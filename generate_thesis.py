@@ -520,7 +520,7 @@ figure_placeholder('图3-4 数据库E-R关系图')
 
 heading3('3.4.2 数据库表概览')
 
-para('系统共设计10张核心表：users（用户）、categories（商品分类）、products（商品）、orders（订单）、order_items（订单明细）、ads（广告）、ad_impressions（广告曝光记录）、reviews（商品评价）、qa（商品问答）、user_behaviors（用户行为日志）。各表的详细字段设计见第4章4.1节。数据库共建立13个索引优化查询性能，重点覆盖外键关联查询和时间范围查询。')
+para('系统共设计10张核心表：users（用户）、categories（商品分类）、products（商品）、orders（订单）、order_items（订单明细）、ads（广告）、ad_impressions（广告曝光记录）、reviews（商品评价）、qa（商品问答）、user_behaviors（用户行为日志）。各表的详细字段定义和索引设计见附录1。数据库共建立13个索引优化查询性能，重点覆盖外键关联查询和时间范围查询。')
 
 doc.add_page_break()
 
@@ -531,259 +531,28 @@ heading1('第4章 系统详细设计与实现')
 
 para('本章以类图、时序图、流程图和数据表为主，辅以文字描述，详细阐述各模块的设计与实现。')
 
-# ── 4.1 数据库详细设计 ──
-heading2('4.1 数据库详细设计')
+# ── 4.1 推荐引擎 ──
+heading2('4.1 推荐引擎详细设计')
 
-para('系统共设计10张数据表，围绕User和Product两个核心实体展开。以下逐表列出各表的字段定义。')
-
-heading3('4.1.1 用户表')
-
-para('用户表（表4-1）用于记录和管理系统中所有用户的基本信息及活跃度状态。通过username和email的唯一约束保证用户身份的唯一性，hashed_password字段存储bcrypt加密后的密码确保账户安全。role字段将用户划分为消费者、商家和管理员三种角色，系统据此实施差异化的权限控制——消费者可浏览和购买商品，商家可管理商品和投放广告，管理员可访问运营数据分析面板。')
-
-para('该表中最关键的两个字段是activity_score和ad_frequency_level。activity_score存储由活跃度引擎实时计算的用户活跃度评分（0-100分），是频控组件做出广告展示决策的核心依据；ad_frequency_level存储根据评分划分的频控等级（high/normal/low），频控组件直接读取该字段确定对应的广告展示策略参数。created_at和last_active_at两个时间字段分别记录用户的注册时间和最后一次活跃时间，为用户生命周期分析和留存率统计提供数据支撑。用户表的字段定义如表4-1所示。')
-
-table_caption('表 4-1 users表字段定义')
-add_table(
-    ['字段', '类型', '约束', '说明'],
-    [
-        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '用户ID，自增主键'],
-        ['username', 'VARCHAR(50)', 'NOT NULL UNIQUE', '用户名，唯一约束'],
-        ['email', 'VARCHAR(120)', 'NOT NULL UNIQUE', '邮箱，唯一约束'],
-        ['hashed_password', 'VARCHAR(255)', 'NOT NULL', 'bcrypt加密后的密码'],
-        ['avatar_url', 'VARCHAR(255)', 'NULLABLE', '头像URL，可为空'],
-        ['role', 'VARCHAR(10)', "NOT NULL DEFAULT 'consumer'", '用户角色：consumer/merchant/admin'],
-        ['activity_score', 'REAL', 'NOT NULL DEFAULT 0.0', '活跃度评分（0-100），供频控组件读取'],
-        ['ad_frequency_level', 'VARCHAR(10)', "NOT NULL DEFAULT 'normal'", '广告频控等级：high/normal/low'],
-        ['created_at', 'DATETIME', 'NOT NULL DEFAULT CURRENT_TIMESTAMP', '注册时间'],
-        ['last_active_at', 'DATETIME', 'NOT NULL DEFAULT CURRENT_TIMESTAMP', '最后活跃时间'],
-    ]
-)
-
-heading3('4.1.2 商品分类表')
-
-para('商品分类表（表4-2）用于组织和管理商品的层级分类体系。通过parent_id字段的自引用设计，系统支持任意深度的分类树结构——顶级分类（如"电子产品"、"服装鞋帽"）的parent_id为NULL，子分类（如"手机"、"笔记本电脑"）通过parent_id指向其父分类。这种层级结构使得前端可以渲染多级品类导航菜单，商品搜索接口可以按品类进行筛选过滤，推荐引擎的Content-Based召回模块也可据此计算商品间的品类相似度。分类表的字段定义如表4-2所示。')
-
-table_caption('表 4-2 categories表字段定义')
-add_table(
-    ['字段', '类型', '约束', '说明'],
-    [
-        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '分类ID，自增主键'],
-        ['name', 'VARCHAR(50)', 'NOT NULL', '分类名称'],
-        ['parent_id', 'INTEGER', 'FK→categories(id) NULLABLE', '父分类ID，顶级分类为NULL'],
-    ]
-)
-
-heading3('4.1.3 商品表')
-
-para('商品表（表4-3）是电商业务的核心数据表，用于存储商品的完整信息。name和description字段记录商品的名称和详细描述，price字段记录商品单价，stock和sales_count分别跟踪实时库存和累计销量。category_id和merchant_id两个外键字段将商品与分类体系和商家用户进行关联，支持按品类浏览和按商家管理两种查询模式。')
-
-para('该表中与推荐引擎密切相关的字段有两个：tags字段以JSON数组格式存储商品标签（如["数码", "手机", "5G"]），Content-Based召回模块通过TF-IDF对标签文本进行向量化，计算商品间的内容相似度；embedding字段以二进制格式存储预计算的商品向量嵌入，供深度排序模型（DeepFM/DIN）直接读取使用，避免每次推荐请求时重复计算向量表示。商品表的字段定义如表4-3所示。')
-
-table_caption('表 4-3 products表字段定义')
-add_table(
-    ['字段', '类型', '约束', '说明'],
-    [
-        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '商品ID，自增主键'],
-        ['name', 'VARCHAR(200)', 'NOT NULL', '商品名称'],
-        ['description', 'TEXT', "NOT NULL DEFAULT ''", '商品描述'],
-        ['price', 'REAL', 'NOT NULL', '商品单价'],
-        ['category_id', 'INTEGER', 'FK→categories(id) NOT NULL', '所属分类ID'],
-        ['merchant_id', 'INTEGER', 'FK→users(id) NOT NULL', '发布商家的用户ID'],
-        ['stock', 'INTEGER', 'NOT NULL DEFAULT 0', '库存数量'],
-        ['sales_count', 'INTEGER', 'NOT NULL DEFAULT 0', '累计销量'],
-        ['tags', 'JSON', 'NULLABLE', '商品标签（JSON数组），用于推荐和广告定向'],
-        ['embedding', 'BLOB', 'NULLABLE', '商品向量嵌入，用于相似度推荐'],
-        ['created_at', 'DATETIME', 'NOT NULL DEFAULT CURRENT_TIMESTAMP', '商品创建时间'],
-    ]
-)
-
-heading3('4.1.4 订单表与订单明细表')
-
-para('订单表（表4-4）和订单明细表（表4-5）共同记录用户的交易信息。orders表存储订单级别的主信息，包括下单用户、订单总金额、订单状态和下单时间；order_items表通过order_id和product_id两个外键将订单与商品进行多对多关联，每条记录表示订单中的一个商品条目。order_items表中的price字段保存下单时刻的商品单价快照，即使商品后续涨价或降价，历史订单金额也不会受到影响。')
-
-para('订单状态字段status采用有限状态机设计，支持pending（待支付）、paid（已支付）、shipped（已发货）、completed（已完成）和cancelled（已取消）五种状态流转。购买行为是活跃度评分中权重最高的行为类型（+10分），因此每次订单创建成功后，系统会自动向user_behaviors表写入一条purchase类型的行为记录，直接影响用户的活跃度等级和广告频控策略。订单表和订单明细表的字段定义分别如表4-4和表4-5所示。')
-
-table_caption('表 4-4 orders表字段定义')
-add_table(
-    ['字段', '类型', '约束', '说明'],
-    [
-        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '订单ID，自增主键'],
-        ['user_id', 'INTEGER', 'FK→users(id) NOT NULL', '下单用户ID'],
-        ['total_amount', 'REAL', 'NOT NULL', '订单总金额'],
-        ['status', 'VARCHAR(10)', "NOT NULL DEFAULT 'pending'", '状态：pending/paid/shipped/completed/cancelled'],
-        ['created_at', 'DATETIME', 'NOT NULL DEFAULT CURRENT_TIMESTAMP', '下单时间'],
-    ]
-)
-
-table_caption('表 4-5 order_items表字段定义')
-add_table(
-    ['字段', '类型', '约束', '说明'],
-    [
-        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '明细ID，自增主键'],
-        ['order_id', 'INTEGER', 'FK→orders(id) NOT NULL', '所属订单ID'],
-        ['product_id', 'INTEGER', 'FK→products(id) NOT NULL', '商品ID'],
-        ['quantity', 'INTEGER', 'NOT NULL', '购买数量'],
-        ['price', 'REAL', 'NOT NULL', '下单时的商品单价（价格快照）'],
-    ]
-)
-
-heading3('4.1.5 广告表')
-
-para('广告表（表4-6）用于记录和管理商家投放的广告配置信息。title和content字段存储广告的标题和文案内容，image_url和target_url分别存储广告图片和点击跳转链接。advertiser_id外键关联投放广告的商家用户，支持按商家维度查询和管理广告。target_tags字段以JSON数组格式存储广告的定向标签（如["手机", "数码"]），广告引擎据此与用户画像进行匹配。')
-
-para('竞价相关字段中，bid_amount的含义随bid_type不同而变化：CPC模式下表示单次点击出价，CPM模式下表示千次展示出价。广告引擎通过bid_amount和预估点击率pCTR计算eCPM进行竞价排序。预算控制字段daily_budget和total_budget分别设定日预算和总预算上限，spent_amount在每次计费后实时累加更新。当spent_amount达到daily_budget时暂停当日投放，达到total_budget时status自动切换为exhausted（预算耗尽），后续不再参与竞价。广告表的字段定义如表4-6所示。')
-
-table_caption('表 4-6 ads表字段定义')
-add_table(
-    ['字段', '类型', '约束', '说明'],
-    [
-        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '广告ID，自增主键'],
-        ['advertiser_id', 'INTEGER', 'FK→users(id) NOT NULL', '广告主（商家）用户ID'],
-        ['title', 'VARCHAR(200)', 'NOT NULL', '广告标题'],
-        ['content', 'TEXT', "NOT NULL DEFAULT ''", '广告文案内容'],
-        ['image_url', 'VARCHAR(255)', "NOT NULL DEFAULT ''", '广告图片URL'],
-        ['target_url', 'VARCHAR(255)', "NOT NULL DEFAULT ''", '点击跳转目标URL'],
-        ['bid_amount', 'REAL', 'NOT NULL', '竞价金额'],
-        ['bid_type', 'VARCHAR(5)', "NOT NULL DEFAULT 'CPC'", '竞价类型：CPC/CPM'],
-        ['daily_budget', 'REAL', 'NOT NULL', '每日预算上限'],
-        ['total_budget', 'REAL', 'NOT NULL', '总预算上限'],
-        ['spent_amount', 'REAL', 'NOT NULL DEFAULT 0.0', '已消耗金额'],
-        ['target_tags', 'JSON', 'NULLABLE', '定向标签（JSON数组），匹配用户兴趣'],
-        ['status', 'VARCHAR(10)', "NOT NULL DEFAULT 'active'", '状态：active/paused/exhausted'],
-        ['created_at', 'DATETIME', 'NOT NULL DEFAULT CURRENT_TIMESTAMP', '广告创建时间'],
-    ]
-)
-
-heading3('4.1.6 广告曝光记录表')
-
-para('广告曝光记录表（表4-7）用于记录广告的全部交互事件，是计费扣款和效果统计的数据源。impression_type字段枚举三种事件类型：show（广告展示，前端在广告卡片进入可视区域时触发上报）、click（用户点击广告，触发CPC计费扣款）和convert（用户通过广告完成购买，用于转化率统计）。context字段以JSON格式存储事件的上下文信息，包括触发页面、广告展示位置和用户设备类型等。')
-
-para('该表在频控组件中发挥核心作用：每次广告请求时，系统需要查询当前用户今日的show类型记录总数（用于日上限检查）和最近一条show记录的时间戳（用于最小间隔检查），这两项查询的结果直接决定频控组件是否允许本次广告展示。广告曝光记录表的字段定义如表4-7所示。')
-
-table_caption('表 4-7 ad_impressions表字段定义')
-add_table(
-    ['字段', '类型', '约束', '说明'],
-    [
-        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '记录ID，自增主键'],
-        ['ad_id', 'INTEGER', 'FK→ads(id) NOT NULL', '关联广告ID'],
-        ['user_id', 'INTEGER', 'FK→users(id) NOT NULL', '触发用户ID'],
-        ['impression_type', 'VARCHAR(10)', 'NOT NULL', '事件类型：show/click/convert'],
-        ['context', 'JSON', 'NULLABLE', '事件上下文（页面来源、设备信息等）'],
-        ['created_at', 'DATETIME', 'NOT NULL DEFAULT CURRENT_TIMESTAMP', '事件发生时间'],
-    ]
-)
-
-heading3('4.1.7 商品评价表')
-
-para('商品评价表（表4-8）用于记录用户对已购商品的评价信息，是社区子系统的核心数据表之一。rating字段存储1-5星的评分值，content字段存储文字评价内容，helpful_count字段统计其他用户对该评价的"有帮助"投票数。评价数据在系统中具有多重用途：rating评分供商品详情页展示评分分布和平均分，content文本供Content-Based推荐模块提取商品特征，helpful_count用于评价列表的排序（优先展示高质量评价）。')
-
-para('从活跃度引擎的角度，评价行为是社区行为中权重最高的类型之一（+5分），每次用户发表评价时系统自动向user_behaviors表写入一条review类型记录；点赞评价时写入helpful类型记录（+2分）。这种设计激励用户积极参与社区互动，通过提升活跃度获得更优的平台体验。商品评价表的字段定义如表4-8所示。')
-
-table_caption('表 4-8 reviews表字段定义')
-add_table(
-    ['字段', '类型', '约束', '说明'],
-    [
-        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '评价ID，自增主键'],
-        ['user_id', 'INTEGER', 'FK→users(id) NOT NULL', '评价用户ID'],
-        ['product_id', 'INTEGER', 'FK→products(id) NOT NULL', '被评价的商品ID'],
-        ['rating', 'INTEGER', 'NOT NULL', '评分（1-5星）'],
-        ['content', 'TEXT', "NOT NULL DEFAULT ''", '评价文字内容'],
-        ['helpful_count', 'INTEGER', 'NOT NULL DEFAULT 0', '"有帮助"投票数'],
-        ['created_at', 'DATETIME', 'NOT NULL DEFAULT CURRENT_TIMESTAMP', '评价发布时间'],
-    ]
-)
-
-heading3('4.1.8 商品问答表')
-
-para('商品问答表（表4-9）用于记录用户围绕商品发起的问答互动，是社区子系统的另一核心数据表。通过该表，用户可以在商品详情页针对商品的使用、规格、售后等问题进行提问，商家或其他有购买经验的用户可以进行回答。question字段存储问题内容，answer字段存储回答内容（未回答时为NULL），answered_by字段关联回答者的用户ID。')
-
-para('问答功能的设计目的是增强用户间的互动和信息共享，帮助潜在购买者消除购物疑虑，同时为平台沉淀有价值的商品信息。从活跃度评分的角度，回答问题是高质量的内容贡献行为，权重设为+5分（与评价相同），鼓励用户积极回答他人的问题。商品问答表的字段定义如表4-9所示。')
-
-table_caption('表 4-9 qa表字段定义')
-add_table(
-    ['字段', '类型', '约束', '说明'],
-    [
-        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '问答ID，自增主键'],
-        ['product_id', 'INTEGER', 'FK→products(id) NOT NULL', '关联商品ID'],
-        ['user_id', 'INTEGER', 'FK→users(id) NOT NULL', '提问用户ID'],
-        ['question', 'TEXT', 'NOT NULL', '问题内容'],
-        ['answer', 'TEXT', 'NULLABLE', '回答内容，未回答时为NULL'],
-        ['answered_by', 'INTEGER', 'FK→users(id) NULLABLE', '回答者用户ID'],
-        ['created_at', 'DATETIME', 'NOT NULL DEFAULT CURRENT_TIMESTAMP', '提问时间'],
-    ]
-)
-
-heading3('4.1.9 用户行为日志表')
-
-para('用户行为日志表（表4-10）是整个系统数据闭环的核心枢纽，同时服务于推荐引擎和活跃度引擎两大核心模块。推荐引擎从中提取用户-商品交互记录构建评分矩阵，训练协同过滤和深度排序模型；活跃度引擎从中读取用户近30天的行为记录，按行为权重和时间衰减因子计算活跃度评分。')
-
-para('behavior_type字段枚举了7种行为类型：view（浏览商品，权重+1）、click（点击，权重+1）、cart（加入购物车，权重+3）、purchase（购买，权重+10）、review（发表评价，权重+5）、search（搜索，权重+1）和login（登录，权重+2）。product_id字段在浏览、点击、加购和购买等商品相关行为中关联具体商品ID，在搜索和登录行为时设为NULL。context字段以JSON格式记录行为上下文信息，如搜索关键词、来源页面URL、停留时长等辅助数据，为推荐模型的特征工程提供额外信息维度。created_at字段记录行为发生的精确时间戳，是活跃度引擎计算时间衰减因子的关键依据。用户行为日志表的字段定义如表4-10所示。')
-
-table_caption('表 4-10 user_behaviors表字段定义')
-add_table(
-    ['字段', '类型', '约束', '说明'],
-    [
-        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '行为记录ID，自增主键'],
-        ['user_id', 'INTEGER', 'FK→users(id) NOT NULL', '行为用户ID'],
-        ['product_id', 'INTEGER', 'FK→products(id) NULLABLE', '关联商品ID（搜索/登录时为NULL）'],
-        ['behavior_type', 'VARCHAR(10)', 'NOT NULL', '行为类型：view/click/cart/purchase/review/search/login'],
-        ['context', 'JSON', 'NULLABLE', '行为上下文（搜索关键词、页面来源等）'],
-        ['created_at', 'DATETIME', 'NOT NULL DEFAULT CURRENT_TIMESTAMP', '行为发生时间'],
-    ]
-)
-
-heading3('4.1.10 索引设计')
-
-para('为提升系统在高频查询场景下的响应速度，数据库共建立13个索引，设计思路围绕三类核心查询展开。')
-
-para('第一类是外键关联查询索引。系统大量业务操作需要通过外键进行关联查询，例如查询某个商家发布的所有商品、某个用户的全部订单、某条广告的所有曝光记录等。对products表的category_id和merchant_id、orders表的user_id、order_items表的order_id、ads表的advertiser_id等外键字段建立索引后，这些关联查询可以避免全表扫描，将查询时间从线性复杂度降低到对数复杂度。')
-
-para('第二类是活跃度引擎的时间范围查询索引。活跃度评分需要读取用户近30天的全部行为记录，因此在user_behaviors表上建立了三个索引：idx_behaviors_user用于按用户ID快速定位行为记录，idx_behaviors_created用于按时间范围过滤近30天的数据，idx_behaviors_type用于按行为类型进行统计分析。这三个索引的配合使得活跃度计算在500条行为记录规模下耗时控制在35毫秒以内。')
-
-para('第三类是频控组件的实时查询索引。广告获取接口需要快速查询用户今日的广告展示次数和最近一次展示时间，idx_ad_impressions_user索引支持按用户ID快速检索曝光记录，避免在高频广告请求场景下成为性能瓶颈。此外，reviews表和qa表的product_id索引支持商品详情页快速加载评价和问答列表。完整的索引定义如表4-11所示。')
-
-table_caption('表 4-11 数据库索引定义')
-add_table(
-    ['索引名', '所在表', '索引字段', '用途'],
-    [
-        ['idx_products_category', 'products', 'category_id', '按分类查询商品'],
-        ['idx_products_merchant', 'products', 'merchant_id', '按商家查询商品'],
-        ['idx_orders_user', 'orders', 'user_id', '查询用户订单'],
-        ['idx_order_items_order', 'order_items', 'order_id', '查询订单明细'],
-        ['idx_ads_advertiser', 'ads', 'advertiser_id', '查询商家广告'],
-        ['idx_ad_impressions_ad', 'ad_impressions', 'ad_id', '按广告查询曝光'],
-        ['idx_ad_impressions_user', 'ad_impressions', 'user_id', '按用户查询曝光（频控用）'],
-        ['idx_reviews_product', 'reviews', 'product_id', '查询商品评价'],
-        ['idx_reviews_user', 'reviews', 'user_id', '查询用户评价'],
-        ['idx_qa_product', 'qa', 'product_id', '查询商品问答'],
-        ['idx_behaviors_user', 'user_behaviors', 'user_id', '按用户查询行为（活跃度计算）'],
-        ['idx_behaviors_type', 'user_behaviors', 'behavior_type', '按行为类型统计'],
-        ['idx_behaviors_created', 'user_behaviors', 'created_at', '时间范围查询（近30天过滤）'],
-    ]
-)
-
-# ── 4.2 推荐引擎 ──
-heading2('4.2 推荐引擎详细设计')
-
-heading3('4.2.1 推荐引擎类结构')
+heading3('4.1.1 推荐引擎类结构')
 
 para('推荐引擎的核心类关系如图4-1所示。RecommendationPipeline作为编排器，聚合五种召回算法、两种排序模型和MMR重排函数。召回层各算法并行运行，结果合并去重后送入排序层；排序层输出pCTR分数后，由mmr_rerank保证结果多样性。')
 
 figure_placeholder('图4-1 推荐引擎核心类图')
 
-heading3('4.2.2 推荐流程')
+heading3('4.1.2 推荐流程')
 
 para('推荐请求的完整处理流程如图4-2所示。若用户无历史行为（冷启动），直接返回热门商品；正常流程经过召回→评分→过滤→排序→重排五个阶段；结果不足时由热门召回补足。')
 
 figure_placeholder('图4-2 推荐流程图')
 
-heading3('4.2.3 推荐请求时序')
+heading3('4.1.3 推荐请求时序')
 
 para('图4-3展示了推荐请求在各组件间的调用时序，从前端发起GET /api/recommend/home到Pipeline编排多路召回、DeepFM/DIN排序、MMR重排并返回Top-N结果的全过程。')
 
 figure_placeholder('图4-3 个性化推荐请求时序图')
 
-heading3('4.2.4 召回算法对比')
+heading3('4.1.4 召回算法对比')
 
 table_caption('表 4-1 召回算法特性对比')
 add_table(
@@ -799,21 +568,58 @@ add_table(
 
 para('UserCF和ItemCF的相似度矩阵均通过cosine_similarity计算，对角线置零排除自身。隐式评分采用浏览=1分、购买=5分。')
 
-heading3('4.2.5 DeepFM排序模型')
+heading3('4.1.5 DeepFM排序模型')
 
 para('DeepFM模型结构如图4-4所示。模型接收稀疏特征（用户ID、商品ID、品类ID等，经Embedding映射为稠密向量）和连续特征（价格、销量等）。FM层通过公式 y=½[(Σvᵢ)²−Σvᵢ²] 计算二阶交叉，DNN层捕获高阶交叉，最终输出 ŷ=σ(y_FM+y_DNN)。')
 
 figure_placeholder('图4-4 DeepFM模型结构图（详细版）')
 
-heading3('4.2.6 DIN排序模型')
+heading3('4.1.6 DIN排序模型')
 
 para('DIN通过注意力机制根据候选商品动态激活用户历史中的相关兴趣，结构如图4-5所示。注意力网络输入为[query, key, query−key, query⊙key]四元组，经4d→64→1网络和softmax输出注意力权重，支持序列掩码处理不等长行为序列。')
 
 figure_placeholder('图4-5 DIN注意力机制结构图')
 
-heading3('4.2.7 MMR多样性重排')
+heading3('4.1.7 MMR多样性重排')
 
 para('MMR选择公式为：MMR(i) = λ·rel(i) − (1−λ)·max sim(i,j)，λ=0.5。sim(i,j)基于品类二值相似度（同品类=1，不同=0）。算法贪心迭代选取MMR最高项，平衡相关性与品类多样性。apply_business_rules函数在重排前过滤已购和已展示商品。')
+
+# ── 4.2 推荐引擎实现 ──
+heading2('4.2 推荐引擎实现')
+
+heading3('4.2.1 召回层')
+
+para('召回层位于app/recommendation/recall包下，五种算法被分别封装为独立类，统一对外暴露fit(训练)和recommend(为指定用户返回Top-N候选)两个方法，由RecommendationPipeline并行调用并合并结果。')
+
+para('UserCF类（user_cf.py）维护user_sim_matrix和interaction_matrix两个成员；fit方法调用sklearn.metrics.pairwise.cosine_similarity对交互矩阵直接求余弦相似度，再用np.fill_diagonal将对角线置零以排除用户与自身的相似度；recommend方法以矩阵乘法sim_scores @ interaction_matrix一步完成相似用户的加权评分汇总，对exclude_interacted=True的位置赋-1过滤已交互商品，最后用np.argsort取Top-N。隐式评分采用浏览记1分、购买记5分的策略在Pipeline构建交互矩阵时统一处理。')
+
+para('ItemCF类（item_cf.py）的成员和方法与UserCF对称，区别在于fit方法对interaction_matrix.T(转置)调用cosine_similarity得到item_sim_matrix；recommend方法以user_ratings @ item_sim_matrix计算每个商品的推荐分。')
+
+para('ContentBasedRecall类（content_based.py）处理商品文本特征：fit方法用sklearn.feature_extraction.text.TfidfVectorizer对商品标签和描述拼接文本进行向量化得到tfidf_matrix，再用cosine_similarity求商品-商品相似度矩阵sim_matrix，文本为空时捕获ValueError并将sim_matrix置None；recommend方法接收用户喜好商品索引列表liked_indices，用np.mean(sim_matrix[liked_indices], axis=0)取多个喜好商品的平均相似度作为推荐分，并对exclude_indices中的商品赋-1过滤，主要服务于商品冷启动。')
+
+para('ALSRecall类（als.py）实现矩阵分解：fit方法使用sklearn.decomposition.NMF（n_components=10，max_iter=200，init="random"）将interaction_matrix分解为user_factors（用户隐因子）和item_factors（物品隐因子，由components_.T取得）；recommend方法通过内积user_factors[user_idx] @ item_factors.T预测用户对所有商品的偏好分。隐因子维度通过min(self.n_components, min(matrix.shape))做保护，防止用户数或商品数过少时维度溢出。')
+
+para('HotRecall类（hot.py）用于冷启动兜底：update方法接收商品ID到热度分数的字典product_scores并直接覆盖；recommend方法使用sorted按分数降序排列、并通过exclude_ids集合过滤已排除商品，返回前n个商品ID。Pipeline将各商品的浏览量与销量加权后写入update。')
+
+heading3('4.2.2 排序层')
+
+para('排序层位于app/recommendation/ranking包下，DeepFM和DIN两个模型均提供PyTorch实现，并通过try-import torch降级为同接口的Numpy推理版本，保证在无GPU/PyTorch依赖的环境下仍可运行。')
+
+para('DeepFM类（deepfm.py）构造时按sparse_field_dims列表依次创建nn.Embedding并放入nn.ModuleList得到embeddings，按公式dnn_input_dim = num_fields × embed_dim + dense_dim构建DNN：每个隐藏层为nn.Linear+nn.ReLU+nn.Dropout(0.2)三元组，最后一层为单输出Linear，整体封装在nn.Sequential里。FMLayer类的forward方法是FM分支的核心，实现 0.5·[(Σvᵢ)²−Σvᵢ²] 公式：embeddings.sum(dim=1).pow(2)计算sum_square，embeddings.pow(2).sum(dim=1)计算square_sum，二者之差再沿特征维求和。DeepFM.forward方法对sparse_input逐域调用embeddings[i]查表后用torch.stack拼成(batch, fields, dim)的三维张量，FM分支调用fm层，DNN分支将该张量reshape为二维并torch.cat上dense_input，两路输出相加后送入output_layer (nn.Sigmoid)得到pCTR。')
+
+para('DIN类（din.py）以nn.Embedding(num_products, embed_dim)作为product_embedding供候选商品和行为序列共享。AttentionLayer类的forward方法将queries扩展为与keys同维后，用torch.cat拼接[queries, keys, queries-keys, queries*keys]四元组送入两层全连接attn（embed_dim*4→64→1），用masked_fill把无效位置置为负无穷再softmax得到注意力权重，最后用torch.bmm加权求和得到用户兴趣表示。DIN.forward方法用torch.arange < seq_lengths.unsqueeze(1)构造序列mask，将注意力输出与候选嵌入拼接后送入DNN（结构与DeepFM的DNN相同）并经Sigmoid得到pCTR。')
+
+para('Numpy降级版本（HAS_TORCH=False分支）保持相同__init__与predict签名：在DeepFM中以np.random.RandomState(42)初始化embed_tables和DNN的weights/biases，predict内部用 0.5*(sum_sq-sq_sum) 复现FM分支、用np.maximum(0, x@w+b)逐层ReLU前向；在DIN中用简化的点积注意力(seq_embed * cand_exp).sum(axis=2)替代神经网络注意力，配合np.where和exp归一化完成softmax。')
+
+heading3('4.2.3 重排层')
+
+para('重排层位于app/recommendation/rerank包下，由mmr_rerank和apply_business_rules两个纯函数构成，被RecommendationPipeline.recommend方法依次调用。')
+
+para('mmr_rerank函数（diversity.py）接收带score和category字段的候选items列表、推荐数量n和权衡参数lambda_param（默认0.5）。函数先用items[0]初始化selected作为相关性最高的种子，然后循环：对remaining中的每一项计算relevance=item["score"]，max_sim=max(s∈selected中同category记1否则记0)，mmr_score=lambda_param·relevance−(1−lambda_param)·max_sim，选取best_score最高的候选，用remaining.pop(best_idx)移入selected。循环终止条件为len(selected) >= n或remaining为空。')
+
+para('apply_business_rules函数（rules.py）实现已购商品和已展示商品的过滤，函数体仅为一个列表推导式：item["id"]同时不在purchased_ids和shown_ids集合中才保留。集合查找的O(1)复杂度避免了在大候选集上的性能问题。短期已展示集合shown_ids由调用方从Redis的user:{uid}:ad_last相关key获取，已购集合purchased_ids从orders联表查询得到。')
+
+para('RecommendationPipeline.recommend方法（pipeline.py）作为编排入口，串起前述所有组件：当_fitted为False或user_idx为None时直接调用self.hot.recommend走冷启动；否则用lambda列表并行调用self.user_cf.recommend和self.item_cf.recommend(均取n*3条作为粗召回)，用set.update合并去重，再用列表推导把每个候选包装为{"id": pid, "score": 1.0/(rank+1), "category": "default"}，依次送入apply_business_rules和mmr_rerank。若结果数少于n，再次调用self.hot.recommend并将其exclude_ids设为已选id集合与purchased_ids的并集，用于补足。广告混排逻辑不在推荐管线内部完成，而是在前端首页组件按"高活跃每3商品插1广告/低活跃密度更低"的规则将广告引擎返回的列表与推荐列表合并展示。')
 
 # ── 4.3 广告引擎 ──
 heading2('4.3 广告引擎详细设计')
@@ -1174,9 +980,247 @@ for ref in refs:
 doc.add_page_break()
 
 # ════════════════════════════════════════════════
-# 附录
+# 附录1 数据库表结构
 # ════════════════════════════════════════════════
-heading1('附录1 系统界面与测试截图')
+heading1('附录1 数据库表结构')
+
+para('本附录列出系统数据库中10张核心表的完整字段定义和13个索引的设计。')
+
+para('系统共设计10张数据表，围绕User和Product两个核心实体展开。以下逐表列出各表的字段定义。')
+
+heading3('附1.1 用户表')
+
+para('用户表（表附1-1）用于记录和管理系统中所有用户的基本信息及活跃度状态。通过username和email的唯一约束保证用户身份的唯一性，hashed_password字段存储bcrypt加密后的密码确保账户安全。role字段将用户划分为消费者、商家和管理员三种角色，系统据此实施差异化的权限控制——消费者可浏览和购买商品，商家可管理商品和投放广告，管理员可访问运营数据分析面板。')
+
+para('该表中最关键的两个字段是activity_score和ad_frequency_level。activity_score存储由活跃度引擎实时计算的用户活跃度评分（0-100分），是频控组件做出广告展示决策的核心依据；ad_frequency_level存储根据评分划分的频控等级（high/normal/low），频控组件直接读取该字段确定对应的广告展示策略参数。created_at和last_active_at两个时间字段分别记录用户的注册时间和最后一次活跃时间，为用户生命周期分析和留存率统计提供数据支撑。用户表的字段定义如表附1-1所示。')
+
+table_caption('表 附1-1 users表字段定义')
+add_table(
+    ['字段', '类型', '约束', '说明'],
+    [
+        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '用户ID，自增主键'],
+        ['username', 'VARCHAR(50)', 'NOT NULL UNIQUE', '用户名，唯一约束'],
+        ['email', 'VARCHAR(120)', 'NOT NULL UNIQUE', '邮箱，唯一约束'],
+        ['hashed_password', 'VARCHAR(255)', 'NOT NULL', 'bcrypt加密后的密码'],
+        ['avatar_url', 'VARCHAR(255)', 'NULLABLE', '头像URL，可为空'],
+        ['role', 'VARCHAR(10)', "NOT NULL DEFAULT 'consumer'", '用户角色：consumer/merchant/admin'],
+        ['activity_score', 'REAL', 'NOT NULL DEFAULT 0.0', '活跃度评分（0-100），供频控组件读取'],
+        ['ad_frequency_level', 'VARCHAR(10)', "NOT NULL DEFAULT 'normal'", '广告频控等级：high/normal/low'],
+        ['created_at', 'DATETIME', 'NOT NULL DEFAULT CURRENT_TIMESTAMP', '注册时间'],
+        ['last_active_at', 'DATETIME', 'NOT NULL DEFAULT CURRENT_TIMESTAMP', '最后活跃时间'],
+    ]
+)
+
+heading3('附1.2 商品分类表')
+
+para('商品分类表（表附1-2）用于组织和管理商品的层级分类体系。通过parent_id字段的自引用设计，系统支持任意深度的分类树结构——顶级分类（如"电子产品"、"服装鞋帽"）的parent_id为NULL，子分类（如"手机"、"笔记本电脑"）通过parent_id指向其父分类。这种层级结构使得前端可以渲染多级品类导航菜单，商品搜索接口可以按品类进行筛选过滤，推荐引擎的Content-Based召回模块也可据此计算商品间的品类相似度。分类表的字段定义如表附1-2所示。')
+
+table_caption('表 附1-2 categories表字段定义')
+add_table(
+    ['字段', '类型', '约束', '说明'],
+    [
+        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '分类ID，自增主键'],
+        ['name', 'VARCHAR(50)', 'NOT NULL', '分类名称'],
+        ['parent_id', 'INTEGER', 'FK→categories(id) NULLABLE', '父分类ID，顶级分类为NULL'],
+    ]
+)
+
+heading3('附1.3 商品表')
+
+para('商品表（表附1-3）是电商业务的核心数据表，用于存储商品的完整信息。name和description字段记录商品的名称和详细描述，price字段记录商品单价，stock和sales_count分别跟踪实时库存和累计销量。category_id和merchant_id两个外键字段将商品与分类体系和商家用户进行关联，支持按品类浏览和按商家管理两种查询模式。')
+
+para('该表中与推荐引擎密切相关的字段有两个：tags字段以JSON数组格式存储商品标签（如["数码", "手机", "5G"]），Content-Based召回模块通过TF-IDF对标签文本进行向量化，计算商品间的内容相似度；embedding字段以二进制格式存储预计算的商品向量嵌入，供深度排序模型（DeepFM/DIN）直接读取使用，避免每次推荐请求时重复计算向量表示。商品表的字段定义如表附1-3所示。')
+
+table_caption('表 附1-3 products表字段定义')
+add_table(
+    ['字段', '类型', '约束', '说明'],
+    [
+        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '商品ID，自增主键'],
+        ['name', 'VARCHAR(200)', 'NOT NULL', '商品名称'],
+        ['description', 'TEXT', "NOT NULL DEFAULT ''", '商品描述'],
+        ['price', 'REAL', 'NOT NULL', '商品单价'],
+        ['category_id', 'INTEGER', 'FK→categories(id) NOT NULL', '所属分类ID'],
+        ['merchant_id', 'INTEGER', 'FK→users(id) NOT NULL', '发布商家的用户ID'],
+        ['stock', 'INTEGER', 'NOT NULL DEFAULT 0', '库存数量'],
+        ['sales_count', 'INTEGER', 'NOT NULL DEFAULT 0', '累计销量'],
+        ['tags', 'JSON', 'NULLABLE', '商品标签（JSON数组），用于推荐和广告定向'],
+        ['embedding', 'BLOB', 'NULLABLE', '商品向量嵌入，用于相似度推荐'],
+        ['created_at', 'DATETIME', 'NOT NULL DEFAULT CURRENT_TIMESTAMP', '商品创建时间'],
+    ]
+)
+
+heading3('附1.4 订单表与订单明细表')
+
+para('订单表（表附1-4）和订单明细表（表附1-5）共同记录用户的交易信息。orders表存储订单级别的主信息，包括下单用户、订单总金额、订单状态和下单时间；order_items表通过order_id和product_id两个外键将订单与商品进行多对多关联，每条记录表示订单中的一个商品条目。order_items表中的price字段保存下单时刻的商品单价快照，即使商品后续涨价或降价，历史订单金额也不会受到影响。')
+
+para('订单状态字段status采用有限状态机设计，支持pending（待支付）、paid（已支付）、shipped（已发货）、completed（已完成）和cancelled（已取消）五种状态流转。购买行为是活跃度评分中权重最高的行为类型（+10分），因此每次订单创建成功后，系统会自动向user_behaviors表写入一条purchase类型的行为记录，直接影响用户的活跃度等级和广告频控策略。订单表和订单明细表的字段定义分别如表附1-4和表附1-5所示。')
+
+table_caption('表 附1-4 orders表字段定义')
+add_table(
+    ['字段', '类型', '约束', '说明'],
+    [
+        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '订单ID，自增主键'],
+        ['user_id', 'INTEGER', 'FK→users(id) NOT NULL', '下单用户ID'],
+        ['total_amount', 'REAL', 'NOT NULL', '订单总金额'],
+        ['status', 'VARCHAR(10)', "NOT NULL DEFAULT 'pending'", '状态：pending/paid/shipped/completed/cancelled'],
+        ['created_at', 'DATETIME', 'NOT NULL DEFAULT CURRENT_TIMESTAMP', '下单时间'],
+    ]
+)
+
+table_caption('表 附1-5 order_items表字段定义')
+add_table(
+    ['字段', '类型', '约束', '说明'],
+    [
+        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '明细ID，自增主键'],
+        ['order_id', 'INTEGER', 'FK→orders(id) NOT NULL', '所属订单ID'],
+        ['product_id', 'INTEGER', 'FK→products(id) NOT NULL', '商品ID'],
+        ['quantity', 'INTEGER', 'NOT NULL', '购买数量'],
+        ['price', 'REAL', 'NOT NULL', '下单时的商品单价（价格快照）'],
+    ]
+)
+
+heading3('附1.5 广告表')
+
+para('广告表（表附1-6）用于记录和管理商家投放的广告配置信息。title和content字段存储广告的标题和文案内容，image_url和target_url分别存储广告图片和点击跳转链接。advertiser_id外键关联投放广告的商家用户，支持按商家维度查询和管理广告。target_tags字段以JSON数组格式存储广告的定向标签（如["手机", "数码"]），广告引擎据此与用户画像进行匹配。')
+
+para('竞价相关字段中，bid_amount的含义随bid_type不同而变化：CPC模式下表示单次点击出价，CPM模式下表示千次展示出价。广告引擎通过bid_amount和预估点击率pCTR计算eCPM进行竞价排序。预算控制字段daily_budget和total_budget分别设定日预算和总预算上限，spent_amount在每次计费后实时累加更新。当spent_amount达到daily_budget时暂停当日投放，达到total_budget时status自动切换为exhausted（预算耗尽），后续不再参与竞价。广告表的字段定义如表附1-6所示。')
+
+table_caption('表 附1-6 ads表字段定义')
+add_table(
+    ['字段', '类型', '约束', '说明'],
+    [
+        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '广告ID，自增主键'],
+        ['advertiser_id', 'INTEGER', 'FK→users(id) NOT NULL', '广告主（商家）用户ID'],
+        ['title', 'VARCHAR(200)', 'NOT NULL', '广告标题'],
+        ['content', 'TEXT', "NOT NULL DEFAULT ''", '广告文案内容'],
+        ['image_url', 'VARCHAR(255)', "NOT NULL DEFAULT ''", '广告图片URL'],
+        ['target_url', 'VARCHAR(255)', "NOT NULL DEFAULT ''", '点击跳转目标URL'],
+        ['bid_amount', 'REAL', 'NOT NULL', '竞价金额'],
+        ['bid_type', 'VARCHAR(5)', "NOT NULL DEFAULT 'CPC'", '竞价类型：CPC/CPM'],
+        ['daily_budget', 'REAL', 'NOT NULL', '每日预算上限'],
+        ['total_budget', 'REAL', 'NOT NULL', '总预算上限'],
+        ['spent_amount', 'REAL', 'NOT NULL DEFAULT 0.0', '已消耗金额'],
+        ['target_tags', 'JSON', 'NULLABLE', '定向标签（JSON数组），匹配用户兴趣'],
+        ['status', 'VARCHAR(10)', "NOT NULL DEFAULT 'active'", '状态：active/paused/exhausted'],
+        ['created_at', 'DATETIME', 'NOT NULL DEFAULT CURRENT_TIMESTAMP', '广告创建时间'],
+    ]
+)
+
+heading3('附1.6 广告曝光记录表')
+
+para('广告曝光记录表（表附1-7）用于记录广告的全部交互事件，是计费扣款和效果统计的数据源。impression_type字段枚举三种事件类型：show（广告展示，前端在广告卡片进入可视区域时触发上报）、click（用户点击广告，触发CPC计费扣款）和convert（用户通过广告完成购买，用于转化率统计）。context字段以JSON格式存储事件的上下文信息，包括触发页面、广告展示位置和用户设备类型等。')
+
+para('该表在频控组件中发挥核心作用：每次广告请求时，系统需要查询当前用户今日的show类型记录总数（用于日上限检查）和最近一条show记录的时间戳（用于最小间隔检查），这两项查询的结果直接决定频控组件是否允许本次广告展示。广告曝光记录表的字段定义如表附1-7所示。')
+
+table_caption('表 附1-7 ad_impressions表字段定义')
+add_table(
+    ['字段', '类型', '约束', '说明'],
+    [
+        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '记录ID，自增主键'],
+        ['ad_id', 'INTEGER', 'FK→ads(id) NOT NULL', '关联广告ID'],
+        ['user_id', 'INTEGER', 'FK→users(id) NOT NULL', '触发用户ID'],
+        ['impression_type', 'VARCHAR(10)', 'NOT NULL', '事件类型：show/click/convert'],
+        ['context', 'JSON', 'NULLABLE', '事件上下文（页面来源、设备信息等）'],
+        ['created_at', 'DATETIME', 'NOT NULL DEFAULT CURRENT_TIMESTAMP', '事件发生时间'],
+    ]
+)
+
+heading3('附1.7 商品评价表')
+
+para('商品评价表（表附1-8）用于记录用户对已购商品的评价信息，是社区子系统的核心数据表之一。rating字段存储1-5星的评分值，content字段存储文字评价内容，helpful_count字段统计其他用户对该评价的"有帮助"投票数。评价数据在系统中具有多重用途：rating评分供商品详情页展示评分分布和平均分，content文本供Content-Based推荐模块提取商品特征，helpful_count用于评价列表的排序（优先展示高质量评价）。')
+
+para('从活跃度引擎的角度，评价行为是社区行为中权重最高的类型之一（+5分），每次用户发表评价时系统自动向user_behaviors表写入一条review类型记录；点赞评价时写入helpful类型记录（+2分）。这种设计激励用户积极参与社区互动，通过提升活跃度获得更优的平台体验。商品评价表的字段定义如表附1-8所示。')
+
+table_caption('表 附1-8 reviews表字段定义')
+add_table(
+    ['字段', '类型', '约束', '说明'],
+    [
+        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '评价ID，自增主键'],
+        ['user_id', 'INTEGER', 'FK→users(id) NOT NULL', '评价用户ID'],
+        ['product_id', 'INTEGER', 'FK→products(id) NOT NULL', '被评价的商品ID'],
+        ['rating', 'INTEGER', 'NOT NULL', '评分（1-5星）'],
+        ['content', 'TEXT', "NOT NULL DEFAULT ''", '评价文字内容'],
+        ['helpful_count', 'INTEGER', 'NOT NULL DEFAULT 0', '"有帮助"投票数'],
+        ['created_at', 'DATETIME', 'NOT NULL DEFAULT CURRENT_TIMESTAMP', '评价发布时间'],
+    ]
+)
+
+heading3('附1.8 商品问答表')
+
+para('商品问答表（表附1-9）用于记录用户围绕商品发起的问答互动，是社区子系统的另一核心数据表。通过该表，用户可以在商品详情页针对商品的使用、规格、售后等问题进行提问，商家或其他有购买经验的用户可以进行回答。question字段存储问题内容，answer字段存储回答内容（未回答时为NULL），answered_by字段关联回答者的用户ID。')
+
+para('问答功能的设计目的是增强用户间的互动和信息共享，帮助潜在购买者消除购物疑虑，同时为平台沉淀有价值的商品信息。从活跃度评分的角度，回答问题是高质量的内容贡献行为，权重设为+5分（与评价相同），鼓励用户积极回答他人的问题。商品问答表的字段定义如表附1-9所示。')
+
+table_caption('表 附1-9 qa表字段定义')
+add_table(
+    ['字段', '类型', '约束', '说明'],
+    [
+        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '问答ID，自增主键'],
+        ['product_id', 'INTEGER', 'FK→products(id) NOT NULL', '关联商品ID'],
+        ['user_id', 'INTEGER', 'FK→users(id) NOT NULL', '提问用户ID'],
+        ['question', 'TEXT', 'NOT NULL', '问题内容'],
+        ['answer', 'TEXT', 'NULLABLE', '回答内容，未回答时为NULL'],
+        ['answered_by', 'INTEGER', 'FK→users(id) NULLABLE', '回答者用户ID'],
+        ['created_at', 'DATETIME', 'NOT NULL DEFAULT CURRENT_TIMESTAMP', '提问时间'],
+    ]
+)
+
+heading3('附1.9 用户行为日志表')
+
+para('用户行为日志表（表附1-10）是整个系统数据闭环的核心枢纽，同时服务于推荐引擎和活跃度引擎两大核心模块。推荐引擎从中提取用户-商品交互记录构建评分矩阵，训练协同过滤和深度排序模型；活跃度引擎从中读取用户近30天的行为记录，按行为权重和时间衰减因子计算活跃度评分。')
+
+para('behavior_type字段枚举了7种行为类型：view（浏览商品，权重+1）、click（点击，权重+1）、cart（加入购物车，权重+3）、purchase（购买，权重+10）、review（发表评价，权重+5）、search（搜索，权重+1）和login（登录，权重+2）。product_id字段在浏览、点击、加购和购买等商品相关行为中关联具体商品ID，在搜索和登录行为时设为NULL。context字段以JSON格式记录行为上下文信息，如搜索关键词、来源页面URL、停留时长等辅助数据，为推荐模型的特征工程提供额外信息维度。created_at字段记录行为发生的精确时间戳，是活跃度引擎计算时间衰减因子的关键依据。用户行为日志表的字段定义如表附1-10所示。')
+
+table_caption('表 附1-10 user_behaviors表字段定义')
+add_table(
+    ['字段', '类型', '约束', '说明'],
+    [
+        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '行为记录ID，自增主键'],
+        ['user_id', 'INTEGER', 'FK→users(id) NOT NULL', '行为用户ID'],
+        ['product_id', 'INTEGER', 'FK→products(id) NULLABLE', '关联商品ID（搜索/登录时为NULL）'],
+        ['behavior_type', 'VARCHAR(10)', 'NOT NULL', '行为类型：view/click/cart/purchase/review/search/login'],
+        ['context', 'JSON', 'NULLABLE', '行为上下文（搜索关键词、页面来源等）'],
+        ['created_at', 'DATETIME', 'NOT NULL DEFAULT CURRENT_TIMESTAMP', '行为发生时间'],
+    ]
+)
+
+heading3('附1.10 索引设计')
+
+para('为提升系统在高频查询场景下的响应速度，数据库共建立13个索引，设计思路围绕三类核心查询展开。')
+
+para('第一类是外键关联查询索引。系统大量业务操作需要通过外键进行关联查询，例如查询某个商家发布的所有商品、某个用户的全部订单、某条广告的所有曝光记录等。对products表的category_id和merchant_id、orders表的user_id、order_items表的order_id、ads表的advertiser_id等外键字段建立索引后，这些关联查询可以避免全表扫描，将查询时间从线性复杂度降低到对数复杂度。')
+
+para('第二类是活跃度引擎的时间范围查询索引。活跃度评分需要读取用户近30天的全部行为记录，因此在user_behaviors表上建立了三个索引：idx_behaviors_user用于按用户ID快速定位行为记录，idx_behaviors_created用于按时间范围过滤近30天的数据，idx_behaviors_type用于按行为类型进行统计分析。这三个索引的配合使得活跃度计算在500条行为记录规模下耗时控制在35毫秒以内。')
+
+para('第三类是频控组件的实时查询索引。广告获取接口需要快速查询用户今日的广告展示次数和最近一次展示时间，idx_ad_impressions_user索引支持按用户ID快速检索曝光记录，避免在高频广告请求场景下成为性能瓶颈。此外，reviews表和qa表的product_id索引支持商品详情页快速加载评价和问答列表。完整的索引定义如表附1-11所示。')
+
+table_caption('表 附1-11 数据库索引定义')
+add_table(
+    ['索引名', '所在表', '索引字段', '用途'],
+    [
+        ['idx_products_category', 'products', 'category_id', '按分类查询商品'],
+        ['idx_products_merchant', 'products', 'merchant_id', '按商家查询商品'],
+        ['idx_orders_user', 'orders', 'user_id', '查询用户订单'],
+        ['idx_order_items_order', 'order_items', 'order_id', '查询订单明细'],
+        ['idx_ads_advertiser', 'ads', 'advertiser_id', '查询商家广告'],
+        ['idx_ad_impressions_ad', 'ad_impressions', 'ad_id', '按广告查询曝光'],
+        ['idx_ad_impressions_user', 'ad_impressions', 'user_id', '按用户查询曝光（频控用）'],
+        ['idx_reviews_product', 'reviews', 'product_id', '查询商品评价'],
+        ['idx_reviews_user', 'reviews', 'user_id', '查询用户评价'],
+        ['idx_qa_product', 'qa', 'product_id', '查询商品问答'],
+        ['idx_behaviors_user', 'user_behaviors', 'user_id', '按用户查询行为（活跃度计算）'],
+        ['idx_behaviors_type', 'user_behaviors', 'behavior_type', '按行为类型统计'],
+        ['idx_behaviors_created', 'user_behaviors', 'created_at', '时间范围查询（近30天过滤）'],
+    ]
+)
+
+
+doc.add_page_break()
+
+# ════════════════════════════════════════════════
+# 附录2
+# ════════════════════════════════════════════════
+heading1('附录2 系统界面与测试截图')
 
 para('本附录展示系统的核心界面截图和测试执行结果截图，供审阅参考。')
 
@@ -1198,9 +1242,9 @@ para('图A.5展示了6个集成测试用例全部通过的执行结果。')
 doc.add_page_break()
 
 # ════════════════════════════════════════════════
-# 附录2 关键代码
+# 附录3 关键代码
 # ════════════════════════════════════════════════
-heading1('附录2 关键源代码')
+heading1('附录3 关键源代码')
 
 para('本附录列出系统核心模块的关键源代码。')
 
