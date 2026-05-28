@@ -996,18 +996,18 @@ para('该表中最关键的两个字段是activity_score和ad_frequency_level。
 
 table_caption('表 附1-1 users表字段定义')
 add_table(
-    ['字段', '类型', '约束', '说明'],
+    ['字段', '类型', '说明'],
     [
-        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '用户ID，自增主键'],
-        ['username', 'VARCHAR(50)', 'NOT NULL UNIQUE', '用户名，唯一约束'],
-        ['email', 'VARCHAR(120)', 'NOT NULL UNIQUE', '邮箱，唯一约束'],
-        ['hashed_password', 'VARCHAR(255)', 'NOT NULL', 'bcrypt加密后的密码'],
-        ['avatar_url', 'VARCHAR(255)', 'NULLABLE', '头像URL，可为空'],
-        ['role', 'VARCHAR(10)', "NOT NULL DEFAULT 'consumer'", '用户角色：consumer/merchant/admin'],
-        ['activity_score', 'REAL', 'NOT NULL DEFAULT 0.0', '活跃度评分（0-100），供频控组件读取'],
-        ['ad_frequency_level', 'VARCHAR(10)', "NOT NULL DEFAULT 'normal'", '广告频控等级：high/normal/low'],
-        ['created_at', 'DATETIME', 'NOT NULL DEFAULT CURRENT_TIMESTAMP', '注册时间'],
-        ['last_active_at', 'DATETIME', 'NOT NULL DEFAULT CURRENT_TIMESTAMP', '最后活跃时间'],
+        ['id', 'INTEGER', '用户ID，自增主键'],
+        ['username', 'VARCHAR(50)', '用户名，唯一约束'],
+        ['email', 'VARCHAR(120)', '邮箱，唯一约束'],
+        ['hashed_password', 'VARCHAR(255)', 'bcrypt加密后的密码'],
+        ['avatar_url', 'VARCHAR(255)', '头像URL，可为空'],
+        ['role', 'VARCHAR(10)', '用户角色：consumer/merchant/admin'],
+        ['activity_score', 'REAL', '活跃度评分（0-100），供频控组件读取'],
+        ['ad_frequency_level', 'VARCHAR(10)', '广告频控等级：high/normal/low'],
+        ['created_at', 'DATETIME', '注册时间'],
+        ['last_active_at', 'DATETIME', '最后活跃时间'],
     ]
 )
 
@@ -1017,11 +1017,11 @@ para('商品分类表（表附1-2）用于组织和管理商品的层级分类�
 
 table_caption('表 附1-2 categories表字段定义')
 add_table(
-    ['字段', '类型', '约束', '说明'],
+    ['字段', '类型', '说明'],
     [
-        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '分类ID，自增主键'],
-        ['name', 'VARCHAR(50)', 'NOT NULL', '分类名称'],
-        ['parent_id', 'INTEGER', 'FK→categories(id) NULLABLE', '父分类ID，顶级分类为NULL'],
+        ['id', 'INTEGER', '分类ID，自增主键'],
+        ['name', 'VARCHAR(50)', '分类名称'],
+        ['parent_id', 'INTEGER', '父分类ID，顶级分类为NULL'],
     ]
 )
 
@@ -1033,19 +1033,19 @@ para('该表中与推荐引擎密切相关的字段有两个：tags字段以JSON
 
 table_caption('表 附1-3 products表字段定义')
 add_table(
-    ['字段', '类型', '约束', '说明'],
+    ['字段', '类型', '说明'],
     [
-        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '商品ID，自增主键'],
-        ['name', 'VARCHAR(200)', 'NOT NULL', '商品名称'],
-        ['description', 'TEXT', "NOT NULL DEFAULT ''", '商品描述'],
-        ['price', 'REAL', 'NOT NULL', '商品单价'],
-        ['category_id', 'INTEGER', 'FK→categories(id) NOT NULL', '所属分类ID'],
-        ['merchant_id', 'INTEGER', 'FK→users(id) NOT NULL', '发布商家的用户ID'],
-        ['stock', 'INTEGER', 'NOT NULL DEFAULT 0', '库存数量'],
-        ['sales_count', 'INTEGER', 'NOT NULL DEFAULT 0', '累计销量'],
-        ['tags', 'JSON', 'NULLABLE', '商品标签（JSON数组），用于推荐和广告定向'],
-        ['embedding', 'BLOB', 'NULLABLE', '商品向量嵌入，用于相似度推荐'],
-        ['created_at', 'DATETIME', 'NOT NULL DEFAULT CURRENT_TIMESTAMP', '商品创建时间'],
+        ['id', 'INTEGER', '商品ID，自增主键'],
+        ['name', 'VARCHAR(200)', '商品名称'],
+        ['description', 'TEXT', '商品描述'],
+        ['price', 'REAL', '商品单价'],
+        ['category_id', 'INTEGER', '所属分类ID'],
+        ['merchant_id', 'INTEGER', '发布商家的用户ID'],
+        ['stock', 'INTEGER', '库存数量'],
+        ['sales_count', 'INTEGER', '累计销量'],
+        ['tags', 'JSON', '商品标签（JSON数组），用于推荐和广告定向'],
+        ['embedding', 'BLOB', '商品向量嵌入，用于相似度推荐'],
+        ['created_at', 'DATETIME', '商品创建时间'],
     ]
 )
 
@@ -1057,25 +1057,25 @@ para('订单状态字段status采用有限状态机设计，支持pending（待�
 
 table_caption('表 附1-4 orders表字段定义')
 add_table(
-    ['字段', '类型', '约束', '说明'],
+    ['字段', '类型', '说明'],
     [
-        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '订单ID，自增主键'],
-        ['user_id', 'INTEGER', 'FK→users(id) NOT NULL', '下单用户ID'],
-        ['total_amount', 'REAL', 'NOT NULL', '订单总金额'],
-        ['status', 'VARCHAR(10)', "NOT NULL DEFAULT 'pending'", '状态：pending/paid/shipped/completed/cancelled'],
-        ['created_at', 'DATETIME', 'NOT NULL DEFAULT CURRENT_TIMESTAMP', '下单时间'],
+        ['id', 'INTEGER', '订单ID，自增主键'],
+        ['user_id', 'INTEGER', '下单用户ID'],
+        ['total_amount', 'REAL', '订单总金额'],
+        ['status', 'VARCHAR(10)', '状态：pending/paid/shipped/completed/cancelled'],
+        ['created_at', 'DATETIME', '下单时间'],
     ]
 )
 
 table_caption('表 附1-5 order_items表字段定义')
 add_table(
-    ['字段', '类型', '约束', '说明'],
+    ['字段', '类型', '说明'],
     [
-        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '明细ID，自增主键'],
-        ['order_id', 'INTEGER', 'FK→orders(id) NOT NULL', '所属订单ID'],
-        ['product_id', 'INTEGER', 'FK→products(id) NOT NULL', '商品ID'],
-        ['quantity', 'INTEGER', 'NOT NULL', '购买数量'],
-        ['price', 'REAL', 'NOT NULL', '下单时的商品单价（价格快照）'],
+        ['id', 'INTEGER', '明细ID，自增主键'],
+        ['order_id', 'INTEGER', '所属订单ID'],
+        ['product_id', 'INTEGER', '商品ID'],
+        ['quantity', 'INTEGER', '购买数量'],
+        ['price', 'REAL', '下单时的商品单价（价格快照）'],
     ]
 )
 
@@ -1087,22 +1087,22 @@ para('竞价相关字段中，bid_amount的含义随bid_type不同而变化：CP
 
 table_caption('表 附1-6 ads表字段定义')
 add_table(
-    ['字段', '类型', '约束', '说明'],
+    ['字段', '类型', '说明'],
     [
-        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '广告ID，自增主键'],
-        ['advertiser_id', 'INTEGER', 'FK→users(id) NOT NULL', '广告主（商家）用户ID'],
-        ['title', 'VARCHAR(200)', 'NOT NULL', '广告标题'],
-        ['content', 'TEXT', "NOT NULL DEFAULT ''", '广告文案内容'],
-        ['image_url', 'VARCHAR(255)', "NOT NULL DEFAULT ''", '广告图片URL'],
-        ['target_url', 'VARCHAR(255)', "NOT NULL DEFAULT ''", '点击跳转目标URL'],
-        ['bid_amount', 'REAL', 'NOT NULL', '竞价金额'],
-        ['bid_type', 'VARCHAR(5)', "NOT NULL DEFAULT 'CPC'", '竞价类型：CPC/CPM'],
-        ['daily_budget', 'REAL', 'NOT NULL', '每日预算上限'],
-        ['total_budget', 'REAL', 'NOT NULL', '总预算上限'],
-        ['spent_amount', 'REAL', 'NOT NULL DEFAULT 0.0', '已消耗金额'],
-        ['target_tags', 'JSON', 'NULLABLE', '定向标签（JSON数组），匹配用户兴趣'],
-        ['status', 'VARCHAR(10)', "NOT NULL DEFAULT 'active'", '状态：active/paused/exhausted'],
-        ['created_at', 'DATETIME', 'NOT NULL DEFAULT CURRENT_TIMESTAMP', '广告创建时间'],
+        ['id', 'INTEGER', '广告ID，自增主键'],
+        ['advertiser_id', 'INTEGER', '广告主（商家）用户ID'],
+        ['title', 'VARCHAR(200)', '广告标题'],
+        ['content', 'TEXT', '广告文案内容'],
+        ['image_url', 'VARCHAR(255)', '广告图片URL'],
+        ['target_url', 'VARCHAR(255)', '点击跳转目标URL'],
+        ['bid_amount', 'REAL', '竞价金额'],
+        ['bid_type', 'VARCHAR(5)', '竞价类型：CPC/CPM'],
+        ['daily_budget', 'REAL', '每日预算上限'],
+        ['total_budget', 'REAL', '总预算上限'],
+        ['spent_amount', 'REAL', '已消耗金额'],
+        ['target_tags', 'JSON', '定向标签（JSON数组），匹配用户兴趣'],
+        ['status', 'VARCHAR(10)', '状态：active/paused/exhausted'],
+        ['created_at', 'DATETIME', '广告创建时间'],
     ]
 )
 
@@ -1114,14 +1114,14 @@ para('该表在频控组件中发挥核心作用：每次广告请求时，系�
 
 table_caption('表 附1-7 ad_impressions表字段定义')
 add_table(
-    ['字段', '类型', '约束', '说明'],
+    ['字段', '类型', '说明'],
     [
-        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '记录ID，自增主键'],
-        ['ad_id', 'INTEGER', 'FK→ads(id) NOT NULL', '关联广告ID'],
-        ['user_id', 'INTEGER', 'FK→users(id) NOT NULL', '触发用户ID'],
-        ['impression_type', 'VARCHAR(10)', 'NOT NULL', '事件类型：show/click/convert'],
-        ['context', 'JSON', 'NULLABLE', '事件上下文（页面来源、设备信息等）'],
-        ['created_at', 'DATETIME', 'NOT NULL DEFAULT CURRENT_TIMESTAMP', '事件发生时间'],
+        ['id', 'INTEGER', '记录ID，自增主键'],
+        ['ad_id', 'INTEGER', '关联广告ID'],
+        ['user_id', 'INTEGER', '触发用户ID'],
+        ['impression_type', 'VARCHAR(10)', '事件类型：show/click/convert'],
+        ['context', 'JSON', '事件上下文（页面来源、设备信息等）'],
+        ['created_at', 'DATETIME', '事件发生时间'],
     ]
 )
 
@@ -1133,15 +1133,15 @@ para('从活跃度引擎的角度，评价行为是社区行为中权重最高�
 
 table_caption('表 附1-8 reviews表字段定义')
 add_table(
-    ['字段', '类型', '约束', '说明'],
+    ['字段', '类型', '说明'],
     [
-        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '评价ID，自增主键'],
-        ['user_id', 'INTEGER', 'FK→users(id) NOT NULL', '评价用户ID'],
-        ['product_id', 'INTEGER', 'FK→products(id) NOT NULL', '被评价的商品ID'],
-        ['rating', 'INTEGER', 'NOT NULL', '评分（1-5星）'],
-        ['content', 'TEXT', "NOT NULL DEFAULT ''", '评价文字内容'],
-        ['helpful_count', 'INTEGER', 'NOT NULL DEFAULT 0', '"有帮助"投票数'],
-        ['created_at', 'DATETIME', 'NOT NULL DEFAULT CURRENT_TIMESTAMP', '评价发布时间'],
+        ['id', 'INTEGER', '评价ID，自增主键'],
+        ['user_id', 'INTEGER', '评价用户ID'],
+        ['product_id', 'INTEGER', '被评价的商品ID'],
+        ['rating', 'INTEGER', '评分（1-5星）'],
+        ['content', 'TEXT', '评价文字内容'],
+        ['helpful_count', 'INTEGER', '"有帮助"投票数'],
+        ['created_at', 'DATETIME', '评价发布时间'],
     ]
 )
 
@@ -1153,15 +1153,15 @@ para('问答功能的设计目的是增强用户间的互动和信息共享，�
 
 table_caption('表 附1-9 qa表字段定义')
 add_table(
-    ['字段', '类型', '约束', '说明'],
+    ['字段', '类型', '说明'],
     [
-        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '问答ID，自增主键'],
-        ['product_id', 'INTEGER', 'FK→products(id) NOT NULL', '关联商品ID'],
-        ['user_id', 'INTEGER', 'FK→users(id) NOT NULL', '提问用户ID'],
-        ['question', 'TEXT', 'NOT NULL', '问题内容'],
-        ['answer', 'TEXT', 'NULLABLE', '回答内容，未回答时为NULL'],
-        ['answered_by', 'INTEGER', 'FK→users(id) NULLABLE', '回答者用户ID'],
-        ['created_at', 'DATETIME', 'NOT NULL DEFAULT CURRENT_TIMESTAMP', '提问时间'],
+        ['id', 'INTEGER', '问答ID，自增主键'],
+        ['product_id', 'INTEGER', '关联商品ID'],
+        ['user_id', 'INTEGER', '提问用户ID'],
+        ['question', 'TEXT', '问题内容'],
+        ['answer', 'TEXT', '回答内容，未回答时为NULL'],
+        ['answered_by', 'INTEGER', '回答者用户ID'],
+        ['created_at', 'DATETIME', '提问时间'],
     ]
 )
 
@@ -1173,14 +1173,14 @@ para('behavior_type字段枚举了7种行为类型：view（浏览商品，权�
 
 table_caption('表 附1-10 user_behaviors表字段定义')
 add_table(
-    ['字段', '类型', '约束', '说明'],
+    ['字段', '类型', '说明'],
     [
-        ['id', 'INTEGER', 'PRIMARY KEY AUTOINCREMENT', '行为记录ID，自增主键'],
-        ['user_id', 'INTEGER', 'FK→users(id) NOT NULL', '行为用户ID'],
-        ['product_id', 'INTEGER', 'FK→products(id) NULLABLE', '关联商品ID（搜索/登录时为NULL）'],
-        ['behavior_type', 'VARCHAR(10)', 'NOT NULL', '行为类型：view/click/cart/purchase/review/search/login'],
-        ['context', 'JSON', 'NULLABLE', '行为上下文（搜索关键词、页面来源等）'],
-        ['created_at', 'DATETIME', 'NOT NULL DEFAULT CURRENT_TIMESTAMP', '行为发生时间'],
+        ['id', 'INTEGER', '行为记录ID，自增主键'],
+        ['user_id', 'INTEGER', '行为用户ID'],
+        ['product_id', 'INTEGER', '关联商品ID（搜索/登录时为NULL）'],
+        ['behavior_type', 'VARCHAR(10)', '行为类型：view/click/cart/purchase/review/search/login'],
+        ['context', 'JSON', '行为上下文（搜索关键词、页面来源等）'],
+        ['created_at', 'DATETIME', '行为发生时间'],
     ]
 )
 
