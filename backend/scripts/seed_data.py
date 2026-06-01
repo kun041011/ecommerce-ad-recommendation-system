@@ -1,222 +1,506 @@
-"""种子数据生成脚本
+"""数据加载脚本（基于真实数据集 Amazon Reviews 2023）
 
-自动生成测试用的模拟数据，包括用户、分类、商品、行为日志、评价、订单和广告。
-用于开发和测试环境的数据初始化，运行后会创建包含完整示例数据的SQLite数据库。
+本脚本不再使用随机生成的模拟数据，而是从真实公开数据集
+**Amazon Reviews 2023**（McAuley Lab, UCSD）加载电商数据，构建演示数据库。
+
+数据集主页: https://amazon-reviews-2023.github.io/
+本项目使用其中的 "Health and Personal Care"（健康与个护）品类。
+
+----------------------------------------------------------------------
+真实 / 派生 / 合成 数据边界（仅供开发者参考；按用户要求，论文与答辩稿中
+不对合成/派生数据做标注）
+----------------------------------------------------------------------
+【真实，直接来自数据集】
+  - 商品：标题、价格、分类层级、描述、店铺（商家）          —— 来自 meta
+  - 用户：消费者来自真实评论者 user_id                      —— 来自 reviews
+  - 评价：评分(1-5)、评论文本、有帮助票数、发表时间          —— 来自 reviews
+  - 购买行为 / 订单：来自 verified_purchase=true 的真实评论   —— 来自 reviews
+  - 评价行为：每条真实评论生成一条 review 行为              —— 来自 reviews
+  - 行为时间戳：保留数据集真实的相对时间间隔（见“时间重定基”）
+
+【派生，由真实购买/评价按规则推导（context.derived=true 标注）】
+  - 浏览(view)：购买前的浏览，锚定在真实购买之前
+  - 加购(cart)/搜索(search)：基于稳定哈希在部分真实锚点上派生（稀疏）
+  - 登录(login)：用户每个“有真实活动的自然日”补一条登录
+
+【合成，数据集中不存在的实体（论文需标注为人工构造）】
+  - 商品问答(QA)、广告(ads) 及其定向/计费参数
+    （均由真实商品/分类确定性地构造，未使用随机数）
+
+时间重定基：数据集评论时间跨越多年，为使“近30天活跃度”有意义，
+将全体时间戳整体平移，使最新一条评论对齐到“当前时间”，平移量
+delta = now - max(timestamp)。该变换**保留**真实的相对时间间隔，
+因此活跃度的时间衰减仍反映用户真实的行为节奏。
+
+运行: python backend/scripts/seed_data.py
+若原始数据缺失，脚本会自动从 HuggingFace 下载到 backend/data/amazon_raw/
+（该目录已在 .gitignore 中，不纳入版本库）。
 """
 
+import hashlib
+import json
 import os
-import random
+import shutil
 import sys
+import tempfile
+import urllib.request
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-# 将项目根目录加入Python路径，确保可以导入app模块
 backend_dir = str(Path(__file__).resolve().parent.parent)
 sys.path.insert(0, backend_dir)
 os.chdir(backend_dir)
 
-# 创建数据目录并设置数据库路径
 data_dir = os.path.join(backend_dir, "data")
-os.makedirs(data_dir, exist_ok=True)
+raw_dir = os.path.join(data_dir, "amazon_raw")
+os.makedirs(raw_dir, exist_ok=True)
 SEED_DB_PATH = os.path.join(data_dir, "ecommerce.db")
 os.environ["DATABASE_URL"] = "sqlite:///" + SEED_DB_PATH.replace("\\", "/")
 
-from app.database import Base, engine
+from sqlalchemy import create_engine as ce
 from sqlalchemy.orm import sessionmaker
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+from app.database import Base
 from app.models import (
-    Ad, AdFrequencyLevel, BehaviorType, BidType, Category,
-    Order, OrderItem, Product, Review, User, UserBehavior, UserRole,
+    Ad, AdFrequencyLevel, BehaviorType, BidType, Category, Order, OrderItem,
+    Product, QA, Review, User, UserBehavior, UserRole,
 )
+from app.activity.scorer import calculate_activity_score, classify_activity_level
 from app.services.auth_service import hash_password
 
-# 商品分类列表（10个一级分类）
-CATEGORIES = ["电子产品", "服装鞋帽", "图书音像", "家居家装", "食品饮料", "运动户外", "玩具母婴", "美妆个护", "汽车用品", "园艺花卉"]
+# ---- 数据集配置 ----
+CATEGORY = "Health_and_Personal_Care"
+HF_BASE = "https://huggingface.co/datasets/McAuley-Lab/Amazon-Reviews-2023/resolve/main/raw"
+REVIEWS_URL = "%s/review_categories/%s.jsonl" % (HF_BASE, CATEGORY)
+META_URL = "%s/meta_categories/meta_%s.jsonl" % (HF_BASE, CATEGORY)
+REVIEWS_PATH = os.path.join(raw_dir, "reviews.jsonl")
+META_PATH = os.path.join(raw_dir, "meta.jsonl")
 
-# 商品名称修饰词（与品类名词组合生成商品名）
-PRODUCT_ADJECTIVES = ["精选", "经典", "豪华", "简约", "智能", "复古", "时尚", "环保", "专业", "旗舰"]
+# ---- 采样规模（非对称 k-core + 上限，保证协同过滤稠密、数据库精简） ----
+# Amazon 原始品类文件用户侧高度稀疏（多数用户仅 1 条评论），故对商品与
+# 用户采用非对称阈值：商品需 >=5 条评论才有协同过滤信号，用户需 >=3 次
+# 交互才可建模。
+MIN_ITEM_CORE = 5     # 商品最少评论数
+MIN_USER_CORE = 3     # 用户最少交互数
+MAX_PRODUCTS = 1500   # 商品数量上限
+MAX_CONSUMERS = 1000  # 消费者数量上限
+MIN_CAT_PRODUCTS = 5  # 小于该商品数的细分类归并入“Other”
 
-# 各分类下的商品名词，每个分类10个
-PRODUCT_NOUNS = {
-    "电子产品": ["手机", "笔记本电脑", "平板电脑", "耳机", "相机", "音箱", "智能手表", "显示器", "键盘", "鼠标"],
-    "服装鞋帽": ["T恤", "牛仔裤", "夹克", "连衣裙", "运动鞋", "帽子", "围巾", "手套", "袜子", "皮带"],
-    "图书音像": ["小说", "教材", "菜谱", "传记", "指南", "手册", "漫画", "词典", "地图册", "日记本"],
-    "家居家装": ["台灯", "椅子", "桌子", "地毯", "抱枕", "窗帘", "书架", "时钟", "花瓶", "镜子"],
-    "食品饮料": ["咖啡", "茶叶", "巧克力", "坚果", "麦片", "意面", "酱料", "香料", "蜂蜜", "果酱"],
-    "运动户外": ["篮球", "球拍", "瑜伽垫", "哑铃", "水壶", "运动包", "跑鞋", "运动手套", "球衣", "运动帽"],
-    "玩具母婴": ["拼图", "桌游", "玩偶", "遥控车", "积木", "机器人", "风筝", "溜溜球", "手办", "毛绒玩具"],
-    "美妆个护": ["面霜", "精华液", "洗发水", "口红", "香水", "面膜", "乳液", "护发油", "香皂", "化妆刷"],
-    "汽车用品": ["车载充电器", "手机支架", "座椅套", "清洁剂", "工具箱", "车灯", "行车记录仪", "香薰", "脚垫", "收纳箱"],
-    "园艺花卉": ["种子", "花盆", "铲子", "水管", "园艺手套", "太阳能灯", "围栏", "营养土", "肥料", "洒水器"],
-}
+DEFAULT_PWD = {"admin": "admin123", "merchant": "merchant123", "consumer": "user123"}
 
-# 评价模板，随机选取作为商品评价内容
-REVIEW_TEMPLATES = [
-    "非常好的产品，正是我需要的！",
-    "性价比很高，质量不错。",
-    "一般般，还有改进空间。",
-    "和预期不太一样，有点失望。",
-    "太棒了！还会回购的。",
-    "中规中矩，没什么特别的。",
-    "包装有点破损，物流需要改进。",
-    "爱了爱了！强烈推荐给大家。",
-    "使用效果不错，发货也快。",
-    "还可以吧，价格公道。",
-    "做工精细，手感很好，超出预期。",
-    "买给家人的，他们很喜欢。",
-    "第二次购买了，一如既往的好。",
-    "颜色比图片稍深一点，但总体满意。",
-    "客服态度很好，问题解决得很快。",
+
+def ensure_raw():
+    """原始数据缺失时从 HuggingFace 下载。"""
+    for path, url, mb in [(REVIEWS_PATH, REVIEWS_URL, 227), (META_PATH, META_URL, 118)]:
+        if not os.path.exists(path) or os.path.getsize(path) < 1024:
+            print("下载 %s (约%dMB) ..." % (os.path.basename(path), mb))
+            urllib.request.urlretrieve(url, path)
+    print("原始数据就绪。")
+
+
+def stable_hash(*parts):
+    """跨进程稳定的整数哈希（内置 hash 对字符串有随机盐，不可复现）。"""
+    h = hashlib.md5("|".join(map(str, parts)).encode("utf-8")).hexdigest()
+    return int(h[:8], 16)
+
+
+def parse_price(v):
+    """把 meta 的 price 字段解析为正浮点数，无法解析返回 None。"""
+    if v is None:
+        return None
+    s = str(v).replace("$", "").replace(",", "").strip()
+    if not s:
+        return None
+    # 形如 "12.99 - 19.99" 取第一段
+    s = s.split()[0].split("-")[0]
+    try:
+        f = float(s)
+        return round(f, 2) if f > 0 else None
+    except ValueError:
+        return None
+
+
+# Health & Personal Care 品类文件的 categories 层级字段为空，故依据真实
+# 商品标题中的关键词确定性地归类到细分类（按顺序首个命中者生效）。
+CATEGORY_RULES = [
+    ("Vitamins & Supplements", ["vitamin", "supplement", "omega", "fish oil", "probiotic",
+        "collagen", "biotin", "magnesium", "zinc", "calcium", "melatonin", "protein",
+        "amino", "herbal", "capsule", "gummies", "gummy", "turmeric", "ashwagandha"]),
+    ("Oral Care", ["toothbrush", "toothpaste", "floss", "mouthwash", "oral", "dental",
+        "teeth", "whitening", "denture"]),
+    ("Skin Care", ["skin", "cream", "lotion", "moistur", "serum", "sunscreen", "spf",
+        "acne", "facial", "cleanser", "wrinkle", "balm", "ointment"]),
+    ("Hair Care", ["hair", "shampoo", "conditioner", "scalp", "dandruff"]),
+    ("Shaving & Grooming", ["shave", "shaving", "razor", "beard", "trimmer", "grooming", "wax"]),
+    ("First Aid & Medical", ["first aid", "bandage", "thermometer", "blood pressure",
+        "glucose", "wound", "antiseptic", "mask", "glove", "brace", "support",
+        "compression", "gauze", "syringe", "test"]),
+    ("Personal Care Devices", ["massager", "massage", "device", "electric", "heating pad",
+        "monitor", "scale", "machine", "humidifier"]),
+    ("Bath & Body", ["soap", "body wash", "deodorant", "bath", "shower", "sanitiz",
+        "wipes", "tissue", "nail"]),
+    ("Eye & Ear Care", ["eye", "ear", "contact lens", "reading glass", "hearing"]),
+    ("Health Foods & Drinks", ["tea", "coffee", "snack", "honey", "powder drink"]),
 ]
 
 
-def seed():
-    """生成全部种子数据的主函数
+def pick_category(title):
+    """依据商品标题关键词确定性归类。"""
+    t = title.lower()
+    for name, kws in CATEGORY_RULES:
+        if any(k in t for k in kws):
+            return name
+    return "Other"
 
-    执行流程：删除旧数据库 -> 建表 -> 依次生成分类、用户、商品、行为、评价、订单、广告。
-    """
-    # 如果已有数据库文件，先删除以确保数据干净
-    if os.path.exists(SEED_DB_PATH):
-        os.remove(SEED_DB_PATH)
-    from sqlalchemy import create_engine as ce
-    fresh_engine = ce("sqlite:///" + SEED_DB_PATH.replace("\\", "/"), connect_args={"check_same_thread": False})
-    FreshSession = sessionmaker(autocommit=False, autoflush=False, bind=fresh_engine)
-    Base.metadata.create_all(bind=fresh_engine)  # 创建所有表
-    db = FreshSession()
 
-    # ---- 生成分类（10个一级分类） ----
-    print("正在生成分类...")
-    cats = {}
-    for name in CATEGORIES:
-        cat = Category(name=name)
-        db.add(cat)
-        db.flush()
-        cats[name] = cat.id
+def load():
+    ensure_raw()
 
-    # ---- 生成用户（1个管理员 + 10个商家 + 89个消费者 = 100个用户） ----
-    print("正在生成用户 (100)...")
-    users = []
-    admin = User(username="admin", email="admin@example.com", hashed_password=hash_password("admin123"), role=UserRole.admin)
-    db.add(admin)
-    users.append(admin)
+    # ---- 1) 读取商品元数据（仅保留有标题且有真实价格者） ----
+    print("读取商品元数据...")
+    meta = {}
+    with open(META_PATH, encoding="utf-8") as f:
+        for line in f:
+            try:
+                d = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            asin = d.get("parent_asin")
+            title = (d.get("title") or "").strip()
+            if not asin or not title:
+                continue
+            price = parse_price(d.get("price"))  # 可能为 None，后续按品类中位数补全
+            desc = d.get("description")
+            if isinstance(desc, list):
+                desc = " ".join(desc)
+            meta[asin] = {
+                "title": title[:200],
+                "price": price,
+                "category": pick_category(title),
+                "description": (desc or "")[:1000],
+                "store": (d.get("store") or "").strip(),
+                "rating_number": int(d.get("rating_number") or 0),
+            }
+    n_priced = sum(1 for m in meta.values() if m["price"] is not None)
+    print("  有效商品: %d（其中含真实价格 %d）" % (len(meta), n_priced))
 
-    for i in range(10):
-        merchant = User(
-            username="merchant_%d" % i, email="merchant_%d@example.com" % i,
-            hashed_password=hash_password("merchant123"), role=UserRole.merchant,
-        )
-        db.add(merchant)
-        users.append(merchant)
+    # ---- 2) 读取评论（仅保留命中有效商品者） ----
+    print("读取评论...")
+    reviews = []  # (user, asin, rating, text, ts_ms, helpful, verified)
+    with open(REVIEWS_PATH, encoding="utf-8") as f:
+        for line in f:
+            try:
+                d = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            asin = d.get("parent_asin")
+            uid = d.get("user_id")
+            if asin not in meta or not uid:
+                continue
+            reviews.append((
+                uid, asin, int(d.get("rating") or 0),
+                (d.get("text") or "")[:1000], int(d.get("timestamp") or 0),
+                int(d.get("helpful_vote") or 0), bool(d.get("verified_purchase")),
+            ))
+    print("  命中评论: %d" % len(reviews))
 
-    for i in range(89):
-        consumer = User(
-            username="user_%d" % i, email="user_%d@example.com" % i,
-            hashed_password=hash_password("user123"), role=UserRole.consumer,
-            activity_score=random.uniform(0, 100),  # 随机初始活跃度
-            ad_frequency_level=random.choice(list(AdFrequencyLevel)),  # 随机频控等级
-        )
-        db.add(consumer)
-        users.append(consumer)
-    db.flush()
+    # ---- 3) k-core 过滤 + 规模上限 ----
+    def counts(revs):
+        ic, uc = defaultdict(int), defaultdict(int)
+        for u, a, *_ in revs:
+            ic[a] += 1
+            uc[u] += 1
+        return ic, uc
 
-    merchants = [u for u in users if u.role == UserRole.merchant]   # 商家列表
-    consumers = [u for u in users if u.role == UserRole.consumer]   # 消费者列表
+    def converge(revs, min_item, min_user):
+        for _ in range(8):
+            ic, uc = counts(revs)
+            n0 = len(revs)
+            revs = [r for r in revs if ic[r[1]] >= min_item and uc[r[0]] >= min_user]
+            if len(revs) == n0:
+                break
+        return revs
 
-    # ---- 生成商品（10分类 x 10修饰词 x 10名词 = 1000件商品） ----
-    print("正在生成商品 (1000+)...")
-    products = []
-    for cat_name, cat_id in cats.items():
-        nouns = PRODUCT_NOUNS[cat_name]
-        for adj in PRODUCT_ADJECTIVES:
-            for noun in nouns:
-                p = Product(
-                    name="%s%s" % (adj, noun),
-                    description="一款%s%s，属于%s品类，品质优良，值得购买。" % (adj, noun, cat_name),
-                    price=round(random.uniform(9.9, 2999.0), 2),  # 随机价格
-                    category_id=cat_id,
-                    merchant_id=random.choice(merchants).id,       # 随机分配商家
-                    stock=random.randint(10, 500),                 # 随机库存
-                    sales_count=random.randint(0, 500),            # 随机销量
-                    tags=[cat_name, adj, noun],                    # 标签：分类+修饰词+名词
-                )
-                db.add(p)
-                products.append(p)
-    db.flush()
-    print("  已创建 %d 件商品" % len(products))
+    reviews = converge(reviews, MIN_ITEM_CORE, MIN_USER_CORE)
 
-    # ---- 生成用户行为日志（12000条，按权重分配行为类型） ----
-    print("正在生成用户行为 (12000+)...")
+    ic, uc = counts(reviews)
+    keep_items = {a for a, _ in sorted(ic.items(), key=lambda x: -x[1])[:MAX_PRODUCTS]}
+    reviews = [r for r in reviews if r[1] in keep_items]
+    ic, uc = counts(reviews)
+    keep_users = {u for u, _ in sorted(uc.items(), key=lambda x: -x[1])[:MAX_CONSUMERS]}
+    reviews = [r for r in reviews if r[0] in keep_users]
+    # 截断上限后再次收敛，保证最小交互数
+    reviews = converge(reviews, MIN_ITEM_CORE, MIN_USER_CORE)
+
+    item_asins = sorted({r[1] for r in reviews})
+    user_ids = sorted({r[0] for r in reviews})
+    print("  采样后: 商品 %d / 消费者 %d / 评论 %d" % (len(item_asins), len(user_ids), len(reviews)))
+
+    # ---- 4) 时间重定基（按用户）：把每个用户最近一次评论对齐到“现在”，
+    # 其余评论按同一偏移平移。这样**保留每个用户真实的评论间隔与聚集程度**，
+    # 同时让所有用户的时间线落在当前窗口内，使近30天活跃度评分能够区分出
+    # 高/普通/低活跃用户（活跃度由用户真实的评论数量与时间聚集度决定）。
     now = datetime.now(timezone.utc)
-    behavior_types = [BehaviorType.view, BehaviorType.click, BehaviorType.cart, BehaviorType.purchase, BehaviorType.search]
-    for _ in range(12000):
-        user = random.choice(consumers)
-        product = random.choice(products)
-        # 行为类型权重：浏览40%、点击25%、加购15%、购买10%、搜索10%
-        btype = random.choices(behavior_types, weights=[40, 25, 15, 10, 10])[0]
-        days_ago = random.uniform(0, 30)  # 最近30天内的随机时间
-        db.add(UserBehavior(
-            user_id=user.id, product_id=product.id, behavior_type=btype,
-            created_at=now - timedelta(days=days_ago),
-        ))
-    db.flush()
+    now_ms = int(now.timestamp() * 1000)
+    user_max = defaultdict(int)
+    for u, a, rate, text, ts, hv, vp in reviews:
+        if ts > user_max[u]:
+            user_max[u] = ts
+    user_delta = {u: now_ms - mx for u, mx in user_max.items()}
 
-    # ---- 生成商品评价（600条，随机评分和评价内容） ----
-    print("正在生成评价 (600+)...")
-    for _ in range(600):
-        user = random.choice(consumers)
-        product = random.choice(products)
-        db.add(Review(
-            user_id=user.id, product_id=product.id,
-            rating=random.randint(1, 5),              # 1-5星随机评分
-            content=random.choice(REVIEW_TEMPLATES),   # 随机选取评价模板
-            helpful_count=random.randint(0, 50),       # 随机"有帮助"数
-            created_at=now - timedelta(days=random.uniform(0, 60)),  # 最近60天
-        ))
-    db.flush()
+    def to_dt(ts_ms, u):
+        mx = user_max[u]
+        base = ts_ms if ts_ms > 0 else mx  # 缺失时间戳按该用户最近时间处理
+        return datetime.fromtimestamp((base + user_delta[u]) / 1000, tz=timezone.utc)
 
-    # ---- 生成订单（350单，每单包含1-4件商品） ----
-    print("正在生成订单 (350+)...")
-    for _ in range(350):
-        user = random.choice(consumers)
-        items = random.sample(products, k=random.randint(1, 4))  # 随机选取1-4件商品
-        total = 0
-        order = Order(user_id=user.id, total_amount=0, created_at=now - timedelta(days=random.uniform(0, 30)))
-        db.add(order)
+    # ---- 建库 ----
+    # 在本地磁盘构建数据库后再复制到目标路径：当仓库位于网络/WSL 共享盘
+    # （SQLite 无法在其上加文件锁）时，先在本地临时目录构建可避免“database
+    # is locked”。若目标本身就是本地盘，复制同样安全。
+    build_path = os.path.join(tempfile.gettempdir(), "ecommerce_build.db")
+    for s in ("", "-wal", "-shm"):
+        if os.path.exists(build_path + s):
+            os.remove(build_path + s)
+    engine = ce("sqlite:///" + build_path.replace("\\", "/"), connect_args={"check_same_thread": False})
+    Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    Base.metadata.create_all(bind=engine)
+    db = Session()
+
+    pwd = {k: hash_password(v) for k, v in DEFAULT_PWD.items()}  # 每种角色只哈希一次
+
+    # ---- 5) 分类（来自真实层级，小类归并 Other） ----
+    print("写入分类...")
+    cat_count = defaultdict(int)
+    for a in item_asins:
+        cat_count[meta[a]["category"]] += 1
+    cat_label = {}
+    for a in item_asins:
+        c = meta[a]["category"]
+        cat_label[a] = c if cat_count[c] >= MIN_CAT_PRODUCTS else "Other"
+    cat_ids = {}
+    for name in sorted(set(cat_label.values())):
+        c = Category(name=name[:50])
+        db.add(c)
         db.flush()
-        for product in items:
-            qty = random.randint(1, 3)  # 每件商品购买1-3个
-            total += product.price * qty
-            db.add(OrderItem(order_id=order.id, product_id=product.id, quantity=qty, price=product.price))
-        order.total_amount = round(total, 2)  # 计算订单总金额
+        cat_ids[name] = c.id
+    print("  分类数: %d" % len(cat_ids))
+
+    # ---- 6) 商家（来自真实 store） ----
+    print("写入商家...")
+    stores = sorted({meta[a]["store"] for a in item_asins if meta[a]["store"]})
+    merchant_id = {}
+    used_names = set()
+    admin = User(username="admin", email="admin@example.com", hashed_password=pwd["admin"], role=UserRole.admin)
+    db.add(admin)
     db.flush()
 
-    # ---- 生成广告（20条，随机分配给商家） ----
-    print("正在生成广告 (20)...")
-    ad_titles = ["限时特惠！", "新品上市", "超值优惠", "限量发售", "热销爆款",
-                 "人气单品", "必买清单", "省钱攻略", "品质之选", "独家特供"]
-    for i in range(20):
-        merchant = random.choice(merchants)
-        cat_name = random.choice(CATEGORIES)
+    def uniq(name, fallback):
+        base = "".join(ch for ch in name if ch.isalnum())[:30] or fallback
+        n, i = base, 1
+        while n in used_names:
+            n = "%s_%d" % (base, i)
+            i += 1
+        used_names.add(n)
+        return n
+
+    for idx, s in enumerate(stores):
+        uname = uniq("m_" + s, "merchant_%d" % idx)
+        m = User(username=uname, email="%s@store.example.com" % uname,
+                 hashed_password=pwd["merchant"], role=UserRole.merchant)
+        db.add(m)
+        db.flush()
+        merchant_id[s] = m.id
+    # 无店铺商品归入默认商家
+    default_merchant = User(username="official_store", email="official@store.example.com",
+                            hashed_password=pwd["merchant"], role=UserRole.merchant)
+    db.add(default_merchant)
+    db.flush()
+    print("  商家数: %d" % (len(merchant_id) + 1))
+
+    # ---- 7) 消费者（来自真实评论者） ----
+    print("写入消费者...")
+    consumer_id = {}
+    for uid in user_ids:
+        uname = uniq("u_" + uid[-12:], "user_%d" % len(consumer_id))
+        u = User(username=uname, email="%s@example.com" % uname,
+                 hashed_password=pwd["consumer"], role=UserRole.consumer)
+        db.add(u)
+        db.flush()
+        consumer_id[uid] = u.id
+
+    # ---- 8) 商品 ----
+    print("写入商品...")
+    purchases_per_item = defaultdict(int)
+    for u, a, rate, text, ts, hv, vp in reviews:
+        if vp:
+            purchases_per_item[a] += 1
+
+    # 价格补全：缺失价格按所属品类的真实价格中位数补全，整体兜底用全局中位数
+    def median(xs):
+        xs = sorted(xs)
+        n = len(xs)
+        return None if n == 0 else (xs[n // 2] if n % 2 else round((xs[n // 2 - 1] + xs[n // 2]) / 2, 2))
+
+    cat_prices = defaultdict(list)
+    all_prices = []
+    for a in item_asins:
+        if meta[a]["price"] is not None:
+            cat_prices[cat_label[a]].append(meta[a]["price"])
+            all_prices.append(meta[a]["price"])
+    global_med = median(all_prices) or 19.99
+    price_of = {}
+    for a in item_asins:
+        if meta[a]["price"] is not None:
+            price_of[a] = meta[a]["price"]
+        else:
+            price_of[a] = median(cat_prices.get(cat_label[a], [])) or global_med
+
+    product_id = {}
+    for a in item_asins:
+        m = meta[a]
+        mid = merchant_id.get(m["store"], default_merchant.id)
+        p = Product(
+            name=m["title"], description=m["description"], price=price_of[a],
+            category_id=cat_ids[cat_label[a]], merchant_id=mid,
+            stock=max(50, min(9999, m["rating_number"] or 100)),  # 数据集无库存，按评分数派生
+            sales_count=purchases_per_item[a],                    # 真实：本数据内核实购买数
+            tags=[cat_label[a]] + ([m["store"]] if m["store"] else []),
+        )
+        db.add(p)
+        db.flush()
+        product_id[a] = p.id
+
+    # ---- 9) 评价 + 行为 + 订单 ----
+    print("写入评价、行为、订单...")
+    user_behaviors = defaultdict(list)   # 供活跃度计算
+    active_days = defaultdict(set)       # (uid)-> {date} 供登录派生
+
+    for u, a, rate, text, ts, hv, vp in reviews:
+        uid, pid = consumer_id[u], product_id[a]
+        dt = to_dt(ts, u)
+        active_days[uid].add(dt.date())
+        # 评价（真实）
+        db.add(Review(user_id=uid, product_id=pid, rating=max(1, min(5, rate)),
+                      content=text, helpful_count=hv, created_at=dt))
+        db.add(UserBehavior(user_id=uid, product_id=pid, behavior_type=BehaviorType.review, created_at=dt))
+        user_behaviors[uid].append({"behavior_type": "review", "created_at": dt})
+        # 购买（真实，来自 verified_purchase）+ 订单
+        if vp:
+            db.add(UserBehavior(user_id=uid, product_id=pid, behavior_type=BehaviorType.purchase, created_at=dt))
+            user_behaviors[uid].append({"behavior_type": "purchase", "created_at": dt})
+            order = Order(user_id=uid, total_amount=price_of[a], created_at=dt)
+            db.add(order)
+            db.flush()
+            db.add(OrderItem(order_id=order.id, product_id=pid, quantity=1, price=price_of[a]))
+            # 派生：购买前 2 小时的浏览
+            vdt = dt - timedelta(hours=2)
+            db.add(UserBehavior(user_id=uid, product_id=pid, behavior_type=BehaviorType.view,
+                                context={"derived": True}, created_at=vdt))
+            user_behaviors[uid].append({"behavior_type": "view", "created_at": vdt})
+            # 派生：约1/3 购买在购买前 1 小时加购（稳定哈希，非随机）
+            if (stable_hash(u, a) % 3) == 0:
+                cdt = dt - timedelta(hours=1)
+                db.add(UserBehavior(user_id=uid, product_id=pid, behavior_type=BehaviorType.cart,
+                                    context={"derived": True}, created_at=cdt))
+                user_behaviors[uid].append({"behavior_type": "cart", "created_at": cdt})
+        # 派生：约1/4 评价当天派生一次搜索（关键词取标题首词）
+        if (stable_hash(a, u) % 4) == 0:
+            sdt = dt - timedelta(hours=3)
+            kw = meta[a]["title"].split(" ")[0][:20]
+            db.add(UserBehavior(user_id=uid, product_id=None, behavior_type=BehaviorType.search,
+                                context={"derived": True, "keyword": kw}, created_at=sdt))
+            user_behaviors[uid].append({"behavior_type": "search", "created_at": sdt})
+
+    # 派生：每个用户每个“有真实活动的自然日”补一次登录
+    for uid, days in active_days.items():
+        for d in days:
+            ldt = datetime(d.year, d.month, d.day, 8, 0, tzinfo=timezone.utc)
+            db.add(UserBehavior(user_id=uid, product_id=None, behavior_type=BehaviorType.login,
+                                context={"derived": True}, created_at=ldt))
+            user_behaviors[uid].append({"behavior_type": "login", "created_at": ldt})
+    db.flush()
+
+    # ---- 10) 活跃度评分（用真实评分引擎，基于重定基后的真实时间） ----
+    print("计算活跃度评分...")
+    level_map = {"high": AdFrequencyLevel.high, "normal": AdFrequencyLevel.normal, "low": AdFrequencyLevel.low}
+    dist = defaultdict(int)
+    for uid, pk in consumer_id.items():
+        score = calculate_activity_score(user_behaviors[pk])
+        lvl = classify_activity_level(score)
+        dist[lvl] += 1
+        user = db.get(User, pk)
+        user.activity_score = score
+        user.ad_frequency_level = level_map[lvl]
+    db.flush()
+    print("  活跃度分布: 高 %d / 普通 %d / 低 %d" % (dist["high"], dist["normal"], dist["low"]))
+
+    # ---- 11) 广告（合成，但由真实热门商品确定性构造） ----
+    print("写入广告（合成）...")
+    top = sorted(item_asins, key=lambda a: -purchases_per_item[a])[:24]
+    bids = [0.5, 1.0, 1.5, 2.0, 3.0]
+    for i, a in enumerate(top):
+        m = meta[a]
         db.add(Ad(
-            advertiser_id=merchant.id,
-            title="%s - %s" % (ad_titles[i % len(ad_titles)], cat_name),
-            content="快来选购我们精选的%s商品，超多优惠等你来！" % cat_name,
-            target_url="/search?category=%s" % cat_name,
-            bid_amount=round(random.uniform(0.5, 5.0), 2),       # 随机竞价金额
-            bid_type=random.choice([BidType.CPC, BidType.CPM]),   # 随机竞价类型
-            daily_budget=round(random.uniform(50, 200), 2),       # 随机每日预算
-            total_budget=round(random.uniform(500, 5000), 2),     # 随机总预算
-            spent_amount=round(random.uniform(0, 100), 2),        # 随机已消耗金额
-            target_tags=[cat_name],                               # 定向到对应分类
+            advertiser_id=merchant_id.get(m["store"], default_merchant.id),
+            title=("【推广】" + m["title"])[:200],
+            content="精选好物推荐：%s" % m["title"][:60],
+            target_url="/products?category=%s" % cat_label[a],
+            bid_amount=bids[i % len(bids)],
+            bid_type=BidType.CPC if i % 2 == 0 else BidType.CPM,
+            daily_budget=100.0, total_budget=1000.0, spent_amount=0.0,
+            target_tags=[cat_label[a]],
         ))
-    db.flush()
 
-    db.commit()  # 提交所有数据
+    # ---- 12) 商品问答（合成，确定性模板） ----
+    print("写入问答（合成）...")
+    qtpl = "这款「%s」质量怎么样，值得购买吗？"
+    atpl = "亲，这款商品评分不错，很多买家反馈使用体验良好，可以放心购买。"
+    qa_consumers = list(consumer_id.values())
+    for i, a in enumerate(top):
+        asker = qa_consumers[i % len(qa_consumers)]
+        answerer = merchant_id.get(meta[a]["store"], default_merchant.id)
+        db.add(QA(product_id=product_id[a], user_id=asker,
+                  question=qtpl % meta[a]["title"][:40], answer=atpl, answered_by=answerer))
+
+    db.commit()
+
+    # ---- 汇总 ----
+    n_users = db.query(User).count()
+    summary = {
+        "categories": db.query(Category).count(),
+        "users": n_users,
+        "merchants": db.query(User).filter(User.role == UserRole.merchant).count(),
+        "consumers": db.query(User).filter(User.role == UserRole.consumer).count(),
+        "products": db.query(Product).count(),
+        "reviews": db.query(Review).count(),
+        "behaviors": db.query(UserBehavior).count(),
+        "orders": db.query(Order).count(),
+        "ads": db.query(Ad).count(),
+        "qa": db.query(QA).count(),
+    }
     db.close()
-    print("\n数据生成完毕！")
-    print("数据库位置: %s" % SEED_DB_PATH)
+    print("\n数据加载完毕！数据库: %s" % SEED_DB_PATH)
+    for k, v in summary.items():
+        print("  %-12s %d" % (k, v))
+    # 行为类型分布（真实 vs 派生）
+    db2 = Session()
+    print("  行为类型分布:")
+    for bt in BehaviorType:
+        c = db2.query(UserBehavior).filter(UserBehavior.behavior_type == bt).count()
+        if c:
+            print("    %-10s %d" % (bt.value, c))
+    db2.close()
+    engine.dispose()
+
+    # ---- 复制到目标路径 ----
+    os.makedirs(os.path.dirname(SEED_DB_PATH), exist_ok=True)
+    for s in ("", "-wal", "-shm"):
+        if os.path.exists(SEED_DB_PATH + s):
+            os.remove(SEED_DB_PATH + s)
+    shutil.copy2(build_path, SEED_DB_PATH)
+    print("已复制数据库到: %s" % SEED_DB_PATH)
 
 
 if __name__ == "__main__":
-    seed()
+    load()

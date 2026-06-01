@@ -322,7 +322,7 @@ cd ecommerce-ad-recommendation-system
 # 启动后端
 cd backend
 pip install -r requirements.txt
-python scripts/seed_data.py    # 生成种子数据（1000+商品、100用户、12000行为记录）
+python scripts/seed_data.py    # 加载真实数据集 Amazon Reviews 2023（首次运行自动下载到 data/amazon_raw/）：624商品/853消费者/5026评价/12242行为
 uvicorn app.main:app --port 8000
 
 # 启动前端（新终端窗口）
