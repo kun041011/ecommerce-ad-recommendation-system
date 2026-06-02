@@ -133,16 +133,21 @@ def formula_placeholder(formula_id, formula_text):
     run2.italic = False
 
 
-def figure_placeholder(caption):
-    """Insert figure placeholder with caption BELOW."""
+def figure_placeholder(caption, img=None, width_in=5.5):
+    """Insert a figure: embed `img` (PNG) if it exists, else a text placeholder; caption BELOW."""
+    import os
+    from docx.shared import Inches
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p.paragraph_format.first_line_indent = None
-    run = p.add_run('\n\n【此处插入流程图】\n（见 docs/figures.md 中对应的 Mermaid 源码，用 Visio 绘制后插入）\n\n')
-    run.font.size = Pt(10.5)
-    run.font.name = '宋体'
-    run.element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
-    run.font.color.rgb = RGBColor(128, 128, 128)
+    if img and os.path.exists(img):
+        p.add_run().add_picture(img, width=Inches(width_in))
+    else:
+        run = p.add_run('\n\n【此处插入流程图】\n（见 docs/figures.md 中对应的 Mermaid 源码，用 Visio 绘制后插入）\n\n')
+        run.font.size = Pt(10.5)
+        run.font.name = '宋体'
+        run.element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
+        run.font.color.rgb = RGBColor(128, 128, 128)
     cap = doc.add_paragraph()
     cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
     cap.paragraph_format.first_line_indent = None
@@ -492,7 +497,7 @@ heading3('3.1.1 功能需求')
 
 para('本系统涉及三类用户角色：（1）消费者——浏览和搜索商品、加入购物车并下单购买、发表商品评价和商品问答；（2）商家——管理自有商品、创建和管理广告（设置出价、预算、定向标签）、查看广告投放效果统计；（3）管理员——查看平台运营仪表盘、分析用户活跃度分布、监控广告投放效果。系统用例如图3-1所示。')
 
-figure_placeholder('图3-1 系统用例图')
+figure_placeholder('图3-1 系统用例图', 'docs/figures/usecase.png')
 
 heading3('3.1.2 非功能需求')
 
@@ -817,7 +822,7 @@ heading3('4.9.2 前端用户操作流程')
 
 para('用户在系统中的操作流程如图4-16所示。用户首次访问时进入登录页面，认证成功后JWT令牌存入localStorage，后续所有API请求通过Axios拦截器自动携带令牌。首页同时加载推荐商品列表和频控过滤后的广告列表，按每3个商品穿插1条广告的规则混排展示。用户浏览商品详情时自动触发view行为上报，发表评价和点赞分别产生review（+5）和helpful（+2）行为记录，直接影响活跃度评分。购物车基于Pinia在客户端管理，结算时调用订单API创建订单并清空购物车。广告展示和点击事件实时上报至impression接口，前端在广告卡片进入可视区域时触发show上报，用户点击时触发click上报。')
 
-figure_placeholder('图4-16 前端用户操作流程图')
+figure_placeholder('图4-16 前端用户操作流程图', 'docs/figures/userflow.png', 3.8)
 
 heading3('4.9.3 广告混排展示设计')
 
