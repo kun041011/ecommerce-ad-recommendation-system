@@ -55,7 +55,7 @@
       <el-col :span="8">
         <el-card>
           <div style="text-align: center; padding: 12px">
-            <p style="color: #666; margin-bottom: 8px">广告点击率 (CTR)</p>
+            <p style="color: #666; margin-bottom: 8px">广告曝光点击率 (CTR)</p>
             <p style="font-size: 32px; font-weight: bold; color: #409eff">{{ ((dashboard.ctr || 0) * 100).toFixed(2) }}%</p>
           </div>
         </el-card>
@@ -111,7 +111,7 @@
         <el-table-column prop="title" label="广告名称" />
         <el-table-column prop="shows" label="展示次数" width="120" sortable />
         <el-table-column prop="clicks" label="点击次数" width="120" sortable />
-        <el-table-column label="点击率" width="120" sortable>
+        <el-table-column label="曝光点击率" width="120" sortable>
           <template #default="{ row }">
             <el-tag :type="row.ctr > 0.05 ? 'success' : row.ctr > 0.02 ? 'warning' : 'danger'" size="small">
               {{ (row.ctr * 100).toFixed(2) }}%
@@ -175,12 +175,12 @@ function initBarChart() {
       axisLabel: { rotate: 30, fontSize: 11 },
     },
     yAxis: [
-      { type: 'value', name: '点击率(%)', axisLabel: { formatter: '{value}%' } },
+      { type: 'value', name: '曝光点击率(%)', axisLabel: { formatter: '{value}%' } },
       { type: 'value', name: '消耗(¥)' },
     ],
     series: [
       {
-        name: '点击率',
+        name: '曝光点击率',
         type: 'bar',
         data: sortedAds.map((a: any) => (a.ctr * 100).toFixed(2)),
         itemStyle: {

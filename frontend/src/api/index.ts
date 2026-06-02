@@ -48,10 +48,6 @@ export const communityApi = {
     api.post(`/qa/${qaId}/answer`, data),
 }
 
-export const activityApi = {
-  myScore: () => api.get('/activity/my-score'),
-}
-
 export const behaviorApi = {
   track: (data: { product_id?: number; behavior_type: string; context?: any }) =>
     api.post('/behavior/track', data),

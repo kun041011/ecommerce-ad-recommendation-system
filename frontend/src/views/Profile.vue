@@ -27,7 +27,6 @@
           <div class="info-row"><span class="info-label">注册时间</span><span>{{ userStore.user.created_at }}</span></div>
         </div>
       </div>
-      <ActivityScore />
     </div>
   </div>
 </template>
@@ -35,7 +34,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useUserStore } from '../stores/user'
-import ActivityScore from '../components/ActivityScore.vue'
 
 const userStore = useUserStore()
 const roleMap: Record<string, { type: string; text: string }> = {
