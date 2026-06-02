@@ -379,7 +379,7 @@ para(
     '系统的核心创新在于将用户在社区中的评价、问答、点赞等行为纳入活跃度评分体系，通过指数时间衰减加权计算活跃度得分，'
     '并据此将用户划分为高活跃、普通和低活跃三个等级。频控组件根据用户等级实施差异化的广告投放策略——高活跃用户允许更高的广告密度以提升收入，'
     '低活跃用户减少广告展示以保护留存率。后端基于FastAPI构建，前端采用Vue 3与Element Plus实现，'
-    '经77个测试用例验证，系统功能完整、性能达标，实现了广告收入与用户留存的平衡优化。'
+    '经77个测试用例验证，系统功能完整、性能达标，能够有效地根据每位用户的个人行为特征与社区数据进行个性化的商品与广告推荐，并在此基础上实现了广告收入与用户留存的平衡优化。'
 )
 
 p = doc.add_paragraph()
@@ -409,7 +409,7 @@ para(
     'activity scores, classifying users into high, normal, and low activity tiers. The frequency control component enforces '
     'differentiated ad delivery policies: higher ad density for active users to boost revenue, and reduced ad exposure for '
     'low-activity users to protect retention. The backend is built with FastAPI, the frontend with Vue 3 and Element Plus. '
-    'Validated by 77 test cases, the system achieves balanced optimization between ad revenue and user retention.'
+    'Validated by 77 test cases, the system can effectively deliver personalized product and ad recommendations tailored to each individual user based on their behavioral characteristics and community data, while achieving balanced optimization between ad revenue and user retention.'
 )
 
 p = doc.add_paragraph()
