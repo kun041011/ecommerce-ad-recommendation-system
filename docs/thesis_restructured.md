@@ -65,7 +65,7 @@ eCPM（effective Cost Per Mille）是广告排序的统一度量指标，其计�
 
 本系统涉及三类用户角色，各角色的功能需求如下：
 
-（1）消费者：浏览和搜索商品、加入购物车并下单购买、发表商品评价和商品问答、查看个人活跃度评分。
+（1）消费者：浏览和搜索商品、加入购物车并下单购买、发表商品评价和商品问答。
 
 （2）商家：管理自有商品（增删改查）、创建和管理广告（设置出价、预算、定向标签）、查看广告投放效果统计。
 
@@ -85,7 +85,6 @@ graph LR
         A3[下单购买]
         A4[发表评价]
         A5[商品问答]
-        A6[查看活跃度]
     end
     subgraph 商家
         B1[管理商品]
@@ -881,7 +880,6 @@ sequenceDiagram
 | 广告 | POST | /api/ads/impression | 上报展示/点击/转化 | 登录 |
 | 广告 | GET | /api/ads/my | 我的广告列表 | 商家 |
 | 广告 | GET | /api/ads/{id}/stats | 广告效果统计 | 商家 |
-| 活跃度 | GET | /api/activity/my-score | 我的活跃度 | 登录 |
 | 推荐 | GET | /api/recommend/home | 首页推荐 | 公开 |
 | 推荐 | GET | /api/recommend/similar/{id} | 相似商品 | 公开 |
 | 推荐 | GET | /api/recommend/for-you | 猜你喜欢 | 登录 |
