@@ -63,8 +63,9 @@ from sqlalchemy.orm import sessionmaker
 
 from app.database import Base
 from app.models import (
-    Ad, AdFrequencyLevel, BehaviorType, BidType, Category, Order, OrderItem,
-    Product, QA, Review, User, UserBehavior, UserRole,
+    Ad, AdFrequencyLevel, AdImpression, BehaviorType, BidType, Category,
+    ImpressionType, Order, OrderItem, Product, QA, Review, User, UserBehavior,
+    UserRole,
 )
 from app.activity.scorer import calculate_activity_score, classify_activity_level
 from app.services.auth_service import hash_password
@@ -439,9 +440,10 @@ def load():
     print("写入广告（合成）...")
     top = sorted(item_asins, key=lambda a: -purchases_per_item[a])[:24]
     bids = [0.5, 1.0, 1.5, 2.0, 3.0]
+    ads_objs = []
     for i, a in enumerate(top):
         m = meta[a]
-        db.add(Ad(
+        ad = Ad(
             advertiser_id=merchant_id.get(m["store"], default_merchant.id),
             title=("【推广】" + m["title"])[:200],
             content="精选好物推荐：%s" % m["title"][:60],
@@ -450,7 +452,39 @@ def load():
             bid_type=BidType.CPC if i % 2 == 0 else BidType.CPM,
             daily_budget=100.0, total_budget=1000.0, spent_amount=0.0,
             target_tags=[cat_label[a]],
-        ))
+        )
+        db.add(ad)
+        ads_objs.append(ad)
+    db.flush()
+
+    # ---- 11b) 广告曝光/点击事件 + 计费（合成，确定性；使 CTR/RPM/广告收入有数据） ----
+    print("写入广告曝光与计费（合成）...")
+    consumers_list = list(consumer_id.values())
+    window_min = 20 * 24 * 60  # 事件分布在近 20 天内
+    imp_total = 0
+    for ad in ads_objs:
+        h = stable_hash("imp", ad.id)
+        shows = 80 + (h % 420)                                    # 80..499 次展示
+        ctr = 0.015 + (stable_hash("ctr", ad.id) % 60) / 1000.0   # 点击率 1.5%..7.4%
+        clicks = max(1, round(shows * ctr))
+        for k in range(shows):
+            uid = consumers_list[(h + k) % len(consumers_list)]
+            ts = now - timedelta(minutes=(h + k * 37) % window_min)
+            db.add(AdImpression(ad_id=ad.id, user_id=uid,
+                                impression_type=ImpressionType.show, created_at=ts))
+        for k in range(clicks):
+            uid = consumers_list[(h + k * 7) % len(consumers_list)]
+            ts = now - timedelta(minutes=(h + k * 53) % window_min)
+            db.add(AdImpression(ad_id=ad.id, user_id=uid,
+                                impression_type=ImpressionType.click, created_at=ts))
+        imp_total += shows + clicks
+        # 计费：CPC 按点击×单次点击价；CPM 按展示×千次展示价/1000；不超过总预算
+        if ad.bid_type == BidType.CPC:
+            ad.spent_amount = round(min(ad.total_budget, clicks * ad.bid_amount), 2)
+        else:
+            ad.spent_amount = round(min(ad.total_budget, shows * ad.bid_amount / 1000.0), 2)
+    db.flush()
+    print("  广告曝光/点击事件: %d" % imp_total)
 
     # ---- 12) 商品问答（合成，确定性模板） ----
     print("写入问答（合成）...")
@@ -478,11 +512,14 @@ def load():
         "orders": db.query(Order).count(),
         "ads": db.query(Ad).count(),
         "qa": db.query(QA).count(),
+        "ad_impressions": db.query(AdImpression).count(),
     }
+    ad_revenue = round(sum(a.spent_amount for a in ads_objs), 2)
     db.close()
     print("\n数据加载完毕！数据库: %s" % SEED_DB_PATH)
     for k, v in summary.items():
         print("  %-12s %d" % (k, v))
+    print("  %-12s %.2f 元" % ("ad_revenue", ad_revenue))
     # 行为类型分布（真实 vs 派生）
     db2 = Session()
     print("  行为类型分布:")
